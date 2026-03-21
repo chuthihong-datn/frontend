@@ -28,8 +28,8 @@ function calcItemSubtotal(
   size?: ProductSize,
   toppings: Topping[] = []
 ): number {
-  const basePrice = product.price
-  const sizeModifier = size?.priceModifier ?? 0
+  const basePrice = product.minPrice
+  const sizeModifier = size?.extraPrice ?? 0
   const toppingTotal = toppings.reduce((sum, t) => sum + t.price, 0)
   return (basePrice + sizeModifier + toppingTotal) * quantity
 }

@@ -1,4 +1,4 @@
-# 🍴 FoodieDelivery — Next.js Basecode
+# 🍴 FoodyDelivery — Next.js Basecode
 
 Dự án food delivery được xây dựng với **Next.js 14 App Router**, **TypeScript**, **Tailwind CSS**, **Zustand**, và **TanStack Query**.
 

@@ -1,36 +1,6 @@
 import ProductCard from './ProductCard'
 import Pagination from '@/components/shared/Pagination'
-import type { Product } from '@/types'
-
-// In production, fetch from API based on searchParams
-const MOCK_PRODUCTS: Product[] = Array.from({ length: 9 }, (_, i) => ({
-  id: String(i + 1),
-  name: ['Bún Chả Hà Nội Đặc Biệt', 'Phở Bò Tái Lăn', 'Cơm Sườn Nướng Muối Ớt',
-         'Combo Sushi Tổng Hợp', 'Cheese Burger Bò Mỹ', 'Cà Phê Sữa Đá Sài Gòn',
-         'Mì Cay Hải Sản', 'Bún Bò Huế', 'Gà Nướng Sa Tế'][i],
-  slug: `product-${i + 1}`,
-  description: 'Món ăn đặc sắc với hương vị đậm đà',
-  price: [65000, 55000, 45000, 120000, 89000, 29000, 75000, 60000, 95000][i],
-  originalPrice: i % 3 === 1 ? [65000, 75000, 55000, 150000, 110000, 35000, 90000, 75000, 120000][i] : undefined,
-  image: [
-    'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
-    'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400',
-    'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400',
-    'https://images.unsplash.com/photo-1617196034738-26f5b8a3e7a6?w=400',
-    'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400',
-    'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400',
-    'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400',
-    'https://images.unsplash.com/photo-1576577445504-6af96477db52?w=400',
-    'https://images.unsplash.com/photo-1598103442097-8b74394b95c3?w=400',
-  ][i],
-  category: { id: '1', name: 'Tất cả', slug: 'all' },
-  rating: [4.5, 4.3, 4.7, 4.8, 4.6, 4.9, 4.4, 4.2, 4.7][i],
-  reviewCount: [120, 89, 234, 156, 98, 312, 75, 44, 189][i],
-  isAvailable: true,
-  badge: i === 0 ? 'new' : i === 3 ? 'hot' : i % 3 === 1 ? 'sale' : undefined,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-}))
+import { getMenusApi } from '@/api/menu'
 
 interface MenuGridProps {
   searchParams: {
@@ -47,17 +17,41 @@ const SORT_OPTIONS = [
   { value: 'rating', label: 'Đánh giá cao' },
 ]
 
-export default function MenuGrid({ searchParams }: MenuGridProps) {
-  const totalItems = 48
+export default async function MenuGrid({ searchParams }: MenuGridProps) {
+  const menus = await getMenusApi()
   const page = Number(searchParams.page ?? 1)
   const limit = 9
+
+  const sortedMenus = [...menus].sort((a, b) => {
+    switch (searchParams.sort) {
+      case 'price_asc':
+        return a.minPrice - b.minPrice
+      case 'price_desc':
+        return b.minPrice - a.minPrice
+      case 'rating':
+        return b.rating - a.rating
+      case 'newest':
+        return b.id - a.id
+      case 'popular':
+      default:
+        return a.id - b.id
+    }
+  })
+
+  const totalItems = sortedMenus.length
+  const safePage = Math.min(Math.max(page, 1), Math.max(1, Math.ceil(totalItems / limit)))
+  const startIndex = (safePage - 1) * limit
+  const endIndex = startIndex + limit
+  const currentPageItems = sortedMenus.slice(startIndex, endIndex)
+  const from = totalItems === 0 ? 0 : startIndex + 1
+  const to = Math.min(endIndex, totalItems)
 
   return (
     <div>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5">
         <p className="text-sm text-secondary-500">
-          Hiển thị <strong className="text-secondary-900">1–{limit}</strong> trong{' '}
+          Hiển thị <strong className="text-secondary-900">{from}–{to}</strong> trong{' '}
           <strong className="text-secondary-900">{totalItems}</strong> món ăn
         </p>
         <div className="flex items-center gap-2">
@@ -74,14 +68,14 @@ export default function MenuGrid({ searchParams }: MenuGridProps) {
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {MOCK_PRODUCTS.map((product) => (
+        {currentPageItems.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
 
       {/* Pagination */}
       <div className="mt-8">
-        <Pagination page={page} totalPages={Math.ceil(totalItems / limit)} />
+        <Pagination page={safePage} totalPages={Math.ceil(totalItems / limit) || 1} />
       </div>
     </div>
   )

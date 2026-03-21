@@ -35,8 +35,8 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
               <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
-                {user?.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                {user?.avtUrl ? (
+                  <img src={user.avtUrl} alt={user.name} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <span className="text-primary font-bold text-lg">
                     {(user?.name ?? 'U')[0].toUpperCase()}

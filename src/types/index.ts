@@ -9,39 +9,62 @@ export interface Category {
   image?: string
 }
 
-export interface Topping {
-  id: string
+export interface Product {
+  id: number
   name: string
-  price: number
+  images: string[]
+  rating: number
+  minPrice: number
 }
 
-export interface Product {
-  id: string
+export interface ProductDetail {
+  id: number
   name: string
-  slug: string
   description: string
-  price: number
-  originalPrice?: number
-  image: string
-  images?: string[]
-  category: Category
+  images: string[]
+  minPrice: number
+  amount: number
+  sizes: ProductSize[]
+  toppings: Topping[]
   rating: number
   reviewCount: number
-  toppings?: Topping[]
-  sizes?: ProductSize[]
-  isAvailable: boolean
-  isFeatured?: boolean
-  badge?: 'new' | 'sale' | 'hot'
-  discount?: number
-  createdAt: string
-  updatedAt: string
+  reviews: Review[]
 }
 
 export interface ProductSize {
-  id: string
-  label: string
-  value: 'S' | 'M' | 'L' | 'XL'
-  priceModifier: number
+  id: number
+  name: string
+  extraPrice: number
+}
+
+export interface Topping {
+  id: number
+  name: string
+  price: number
+}
+
+export interface Review {
+  id: number
+  userName: string
+  rating: number
+  comment: string
+  createdAt: string
+}
+
+export function mapToProductDetail(item: any): ProductDetail {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    images: item.images || [],
+    minPrice: item.minPrice,
+    amount: item.amount,
+    sizes: item.sizes || [],
+    toppings: item.toppings || [],
+    rating: item.rating,
+    reviewCount: item.reviewCount,
+    reviews: item.reviews || []
+  }
 }
 
 // ============================================================
@@ -145,11 +168,11 @@ export type UserRole = 'customer' | 'admin'
 export type PaymentMethod = 'vnpay' | 'momo' | 'cash'
 
 export interface User {
-  id: string
+  id: number
   name: string
   email: string
   phone?: string
-  avatar?: string
+  avtUrl?: string
   role: UserRole
   createdAt: string
 }
@@ -161,6 +184,30 @@ export interface AuthSession {
   expiresAt: number
 }
 
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  id: number
+  fullName: string
+  token: string
+  email: string
+  role: string
+}
+
+export interface RegisterRequest {
+  fullName: string
+  email: string
+  phone: string
+  password: string
+}
+
+export interface RegisterResponse {
+  success: boolean
+  message: string
+}
 // ============================================================
 // API RESPONSE
 // ============================================================

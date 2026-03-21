@@ -19,7 +19,8 @@ export function formatCurrency(amount: number): string {
 /**
  * Format number with dots (e.g., 125.000đ)
  */
-export function formatPrice(amount: number): string {
+export function formatPrice(amount?: number): string {
+  if (!amount) return "0đ"
   return `${amount.toLocaleString('vi-VN')}đ`
 }
 

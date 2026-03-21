@@ -6,6 +6,8 @@ import { Eye, EyeOff, Mail, Lock, UtensilsCrossed } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
+import { loginApi} from '@/api/auth'
+import { UserRole } from '@/types'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,19 +19,34 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+
     try {
-      // Replace with real API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const res = await loginApi(form)
+      const role: UserRole = res.role === 'ADMIN' ? 'admin' : 'customer'
+
       setUser(
-        { id: '1', name: 'Nguyễn Văn A', email: form.email, role: 'customer', createdAt: new Date().toISOString() },
-        'mock_token'
+        {
+          id: res.id,
+          name: res.fullName,
+          email: res.email,
+          role: role,
+          createdAt: new Date().toISOString(),
+        },
+        res.token
       )
-      toast.success("Đăng nhập thành công!", {
-        duration: 2000, // 2 giây
-      })
-      router.push('/')
-    } catch {
-      toast.error('Email hoặc mật khẩu không đúng')
+
+      toast.success("Đăng nhập thành công!", { duration: 2000 })
+
+      if (role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/')
+      }
+
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || 'Email hoặc mật khẩu không đúng'
+      )
     } finally {
       setIsLoading(false)
     }
