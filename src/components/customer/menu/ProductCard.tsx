@@ -37,11 +37,17 @@ function sanitizeImageSrc(src?: string): string {
 interface ProductCardProps {
   product: Product
   className?: string
+  showSoldCount?: boolean
 }
 
-export default function ProductCard({ product, className }: ProductCardProps) {
+export default function ProductCard({
+  product,
+  className,
+  showSoldCount = false,
+}: ProductCardProps) {
   const addItem = useCartStore((state) => state.addItem)
   const firstImage = sanitizeImageSrc(product.images?.[0])
+  const hasRating = Number(product.rating) > 0
   const [imageSrc, setImageSrc] = useState(firstImage)
 
   useEffect(() => {
@@ -74,8 +80,14 @@ export default function ProductCard({ product, className }: ProductCardProps) {
             {product.name}
           </h3>
 
+          {showSoldCount && (
+            <p className="text-xs text-secondary-500 mb-1">
+              Đã bán: <span className="font-medium text-secondary-700">{product.totalSold ?? 0}</span>
+            </p>
+          )}
+
           {/* Rating */}
-          <div className="flex items-center gap-1 mb-2">
+          <div className={cn('flex items-center gap-1 mb-2', !hasRating && 'invisible')}>
             <Star className="w-3 h-3 fill-warning text-warning" />
             <span className="text-xs text-secondary-600">
               {product.rating}

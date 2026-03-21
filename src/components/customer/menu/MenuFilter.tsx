@@ -3,52 +3,48 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { CakeSlice, ChefHat, CookingPot, Martini, Soup } from 'lucide-react'
-
-const CATEGORIES = [
-  { id: 'all', label: 'Tất cả món', icon: <ChefHat /> },
-  { id: 'pho-bun', label: 'Phở & Bún', icon: <Soup /> },
-  { id: 'com-van-phong', label: 'Cơm văn phòng', icon: <CookingPot /> },
-  { id: 'mon-an-nhanh', label: 'Món ăn nhanh', icon: <CakeSlice /> },
-  { id: 'do-uong', label: 'Đồ uống', icon: <Martini /> },
-]
+import type { Category } from '@/types'
 
 const PRICE_RANGES = [
   { label: 'Dưới 50k', min: 0, max: 50000 },
   { label: '50k – 100k', min: 50000, max: 100000 },
-  { label: '100k – 200k', min: 100000, max: 200000 },
-  { label: 'Trên 200k', min: 200000, max: 99999999 },
+  { label: 'trên 100k', min: 100000, max: 99999999 },
 ]
 
 interface MenuFilterProps {
-  searchParams: {
-    category?: string
-    minPrice?: string
-    maxPrice?: string
-  }
+  categories: Category[]
 }
 
-export default function MenuFilter({ searchParams }: MenuFilterProps) {
+export default function MenuFilter({ categories }: MenuFilterProps) {
   const router = useRouter()
   const params = useSearchParams()
 
-  const setParam = useCallback(
-    (key: string, value: string | null) => {
+  const setParams = useCallback(
+    (updates: Record<string, string | null>) => {
       const current = new URLSearchParams(params.toString())
-      if (value === null) {
-        current.delete(key)
-      } else {
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null) {
+          current.delete(key)
+          return
+        }
+
         current.set(key, value)
-      }
+      })
+
       current.delete('page')
       router.push(`/menu?${current.toString()}`)
     },
     [params, router]
   )
 
-  const activeCategory = searchParams.category ?? 'all'
-  const activeMin = searchParams.minPrice
-  const activeMax = searchParams.maxPrice
+  const activeCategory = params.get('category') ?? 'all'
+  const activeMin = params.get('minPrice')
+  const activeMax = params.get('maxPrice')
+  const categoryOptions = [
+    { id: 'all', label: 'Tất cả món' },
+    ...categories.map((cat) => ({ id: String(cat.id), label: cat.name })),
+  ]
 
   return (
     <div className="space-y-6">
@@ -56,10 +52,10 @@ export default function MenuFilter({ searchParams }: MenuFilterProps) {
       <div>
         <h3 className="font-semibold text-sm text-secondary-900 mb-3">Danh mục</h3>
         <ul className="space-y-1">
-          {CATEGORIES.map((cat) => (
+          {categoryOptions.map((cat) => (
             <li key={cat.id}>
               <button
-                onClick={() => setParam('category', cat.id === 'all' ? null : cat.id)}
+                onClick={() => setParams({ category: cat.id === 'all' ? null : cat.id })}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all',
                   activeCategory === cat.id
@@ -67,8 +63,7 @@ export default function MenuFilter({ searchParams }: MenuFilterProps) {
                     : 'text-secondary-700 hover:bg-secondary-100'
                 )}
               >
-                <span>{cat.icon}</span>
-                {cat.label}
+                <span>{cat.label}</span>
               </button>
             </li>
           ))}
@@ -87,11 +82,12 @@ export default function MenuFilter({ searchParams }: MenuFilterProps) {
                 <button
                   onClick={() => {
                     if (isActive) {
-                      setParam('minPrice', null)
-                      setParam('maxPrice', null)
+                      setParams({ minPrice: null, maxPrice: null })
                     } else {
-                      setParam('minPrice', String(range.min))
-                      setParam('maxPrice', String(range.max))
+                      setParams({
+                        minPrice: String(range.min),
+                        maxPrice: String(range.max),
+                      })
                     }
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all text-left"

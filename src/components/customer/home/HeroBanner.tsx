@@ -23,8 +23,14 @@ export default function HeroBanner() {
         </div>
 
         {/* Decorative pizza image */}
-        <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden md:block">
-          <Image src='/images/pizza.png' alt='' width={500} height={100} />
+        <div className="absolute right-12 top-1/2 -translate-y-1/2 hidden md:block">
+          <Image
+          src='https://res.cloudinary.com/ddtccmifs/image/upload/v1774103183/bun-cha-ha-noi-1-1024x682_qr95lr.webp'   
+          alt=''
+          width={360}
+          height={100}
+          className="rounded-xl"
+        />
         </div>
       </div>
     </section>

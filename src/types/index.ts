@@ -2,11 +2,9 @@
 // PRODUCT / MENU
 // ============================================================
 export interface Category {
-  id: string
+  id: number
   name: string
-  slug: string
-  icon?: string
-  image?: string
+  iconUrl: string
 }
 
 export interface Product {
@@ -15,6 +13,7 @@ export interface Product {
   images: string[]
   rating: number
   minPrice: number
+  totalSold?: number
 }
 
 export interface ProductDetail {

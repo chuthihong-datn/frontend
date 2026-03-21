@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import MenuFilter from '@/components/customer/menu/MenuFilter'
 import MenuGrid from '@/components/customer/menu/MenuGrid'
+import { getCategoriesApi } from '@/api/category'
 
 export const metadata: Metadata = {
   title: 'Thực đơn',
@@ -18,7 +19,9 @@ interface MenuPageProps {
   }
 }
 
-export default function MenuPage({ searchParams }: MenuPageProps) {
+export default async function MenuPage({ searchParams }: MenuPageProps) {
+  const categories = await getCategoriesApi()
+
   return (
     <div className="container-page py-8">
       {/* Breadcrumb */}
@@ -36,7 +39,7 @@ export default function MenuPage({ searchParams }: MenuPageProps) {
       <div className="flex gap-8">
         {/* Sidebar Filter */}
         <aside className="hidden lg:block w-52 shrink-0">
-          <MenuFilter searchParams={searchParams} />
+          <MenuFilter categories={categories} />
         </aside>
 
         {/* Product Grid */}

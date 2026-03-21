@@ -1,40 +1,62 @@
 import ProductCard from './ProductCard'
 import Pagination from '@/components/shared/Pagination'
-import { getMenusApi } from '@/api/menu'
+import { getMenusApi, getMenusByCategoryApi } from '@/api/menu'
+import SortSelect from '@/components/customer/menu/SortSelect'
 
 interface MenuGridProps {
   searchParams: {
+    category?: string
+    minPrice?: string
+    maxPrice?: string
     sort?: string
     page?: string
   }
 }
 
 const SORT_OPTIONS = [
-  { value: 'popular', label: 'Phổ biến nhất' },
-  { value: 'newest', label: 'Mới nhất' },
+  { value: 'all', label: 'Mặc định' },
   { value: 'price_asc', label: 'Giá tăng dần' },
   { value: 'price_desc', label: 'Giá giảm dần' },
   { value: 'rating', label: 'Đánh giá cao' },
-]
+] as const
 
 export default async function MenuGrid({ searchParams }: MenuGridProps) {
-  const menus = await getMenusApi()
+  const categoryId = Number(searchParams.category)
+  const minPrice = Number(searchParams.minPrice)
+  const maxPrice = Number(searchParams.maxPrice)
+  const hasValidCategory = Number.isFinite(categoryId) && categoryId > 0
+  const hasMinPrice = Number.isFinite(minPrice)
+  const hasMaxPrice = Number.isFinite(maxPrice)
+  const menus = hasValidCategory
+    ? await getMenusByCategoryApi(categoryId)
+    : await getMenusApi()
   const page = Number(searchParams.page ?? 1)
   const limit = 9
 
-  const sortedMenus = [...menus].sort((a, b) => {
-    switch (searchParams.sort) {
+  const filteredMenus = menus.filter((menu) => {
+    if (hasMinPrice && menu.minPrice < minPrice) {
+      return false
+    }
+
+    if (hasMaxPrice && menu.minPrice > maxPrice) {
+      return false
+    }
+
+    return true
+  })
+
+  const sortType = searchParams.sort ?? 'all'
+  const sortedMenus = [...filteredMenus].sort((a, b) => {
+    switch (sortType) {
       case 'price_asc':
         return a.minPrice - b.minPrice
       case 'price_desc':
         return b.minPrice - a.minPrice
       case 'rating':
         return b.rating - a.rating
-      case 'newest':
-        return b.id - a.id
-      case 'popular':
+      case 'all':
       default:
-        return a.id - b.id
+        return 0
     }
   })
 
@@ -56,13 +78,7 @@ export default async function MenuGrid({ searchParams }: MenuGridProps) {
         </p>
         <div className="flex items-center gap-2">
           <span className="text-sm text-secondary-500">Sắp xếp:</span>
-          <select className="text-sm border border-border rounded-xl px-3 py-1.5 bg-white focus:outline-none focus:border-primary">
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <SortSelect options={[...SORT_OPTIONS]} />
         </div>
       </div>
 
