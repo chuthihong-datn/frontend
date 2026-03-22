@@ -76,7 +76,7 @@ export default function VoucherPage() {
       </nav>
 
       <div className="flex items-center justify-between mb-8">
-        <h1 className="font-display text-3xl font-bold text-secondary-900">
+        <h1 className="text-3xl font-bold text-secondary-900 mb-1">
           Kho Voucher & Ưu Đãi
         </h1>
         <span className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-100 px-3 py-1.5 rounded-full">

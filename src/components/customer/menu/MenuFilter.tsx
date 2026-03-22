@@ -18,6 +18,12 @@ interface MenuFilterProps {
 export default function MenuFilter({ categories }: MenuFilterProps) {
   const router = useRouter()
   const params = useSearchParams()
+  
+  // Khi có search keyword, không highlight category nào
+  const currentSearch = params.get('search')
+  const activeCategory = currentSearch ? null : (params.get('category') ?? 'all')
+  const activeMin = params.get('minPrice')
+  const activeMax = params.get('maxPrice')
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -37,10 +43,6 @@ export default function MenuFilter({ categories }: MenuFilterProps) {
     },
     [params, router]
   )
-
-  const activeCategory = params.get('category') ?? 'all'
-  const activeMin = params.get('minPrice')
-  const activeMax = params.get('maxPrice')
   const categoryOptions = [
     { id: 'all', label: 'Tất cả món' },
     ...categories.map((cat) => ({ id: String(cat.id), label: cat.name })),
@@ -55,7 +57,18 @@ export default function MenuFilter({ categories }: MenuFilterProps) {
           {categoryOptions.map((cat) => (
             <li key={cat.id}>
               <button
-                onClick={() => setParams({ category: cat.id === 'all' ? null : cat.id })}
+                onClick={() => {
+                  // Chỉ xóa search khi chuyển sang danh mục khác
+                  if (cat.id === activeCategory) {
+                    return
+                  }
+                  setParams({ 
+                    category: cat.id === 'all' ? null : cat.id,
+                    search: null,
+                    minPrice: null,
+                    maxPrice: null
+                  })
+                }}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all',
                   activeCategory === cat.id
@@ -82,8 +95,10 @@ export default function MenuFilter({ categories }: MenuFilterProps) {
                 <button
                   onClick={() => {
                     if (isActive) {
+                      // Bỏ filter giá - không xóa search, chỉ bỏ minPrice/maxPrice
                       setParams({ minPrice: null, maxPrice: null })
                     } else {
+                      // Áp dụng filter giá - giữ search keyword
                       setParams({
                         minPrice: String(range.min),
                         maxPrice: String(range.max),

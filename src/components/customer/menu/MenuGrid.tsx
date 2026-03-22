@@ -1,10 +1,12 @@
 import ProductCard from './ProductCard'
 import Pagination from '@/components/shared/Pagination'
-import { getMenusApi, getMenusByCategoryApi } from '@/api/menu'
+import { getMenusApi, getMenusByCategoryApi, searchMenusApi } from '@/api/menu'
 import SortSelect from '@/components/customer/menu/SortSelect'
+import type { Product } from '@/types'
 
 interface MenuGridProps {
   searchParams: {
+    search?: string
     category?: string
     minPrice?: string
     maxPrice?: string
@@ -24,12 +26,22 @@ export default async function MenuGrid({ searchParams }: MenuGridProps) {
   const categoryId = Number(searchParams.category)
   const minPrice = Number(searchParams.minPrice)
   const maxPrice = Number(searchParams.maxPrice)
+  const searchKeyword = searchParams.search ?? ''
+  
   const hasValidCategory = Number.isFinite(categoryId) && categoryId > 0
   const hasMinPrice = Number.isFinite(minPrice)
   const hasMaxPrice = Number.isFinite(maxPrice)
-  const menus = hasValidCategory
-    ? await getMenusByCategoryApi(categoryId)
-    : await getMenusApi()
+  
+  // Fetch menus based on search or category
+  let menus: Product[] = []
+  if (searchKeyword.trim()) {
+    menus = await searchMenusApi(searchKeyword)
+  } else if (hasValidCategory) {
+    menus = await getMenusByCategoryApi(categoryId)
+  } else {
+    menus = await getMenusApi()
+  }
+  
   const page = Number(searchParams.page ?? 1)
   const limit = 9
 
@@ -72,10 +84,17 @@ export default async function MenuGrid({ searchParams }: MenuGridProps) {
     <div>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5">
-        <p className="text-sm text-secondary-500">
-          Hiển thị <strong className="text-secondary-900">{from}–{to}</strong> trong{' '}
-          <strong className="text-secondary-900">{totalItems}</strong> món ăn
-        </p>
+        <div>
+          {searchKeyword && (
+            <p className="text-sm text-secondary-500 mb-2">
+              Kết quả tìm kiếm cho: <strong className="text-primary">"{searchKeyword}"</strong>
+            </p>
+          )}
+          <p className="text-sm text-secondary-500">
+            Hiển thị <strong className="text-secondary-900">{from}–{to}</strong> trong{' '}
+            <strong className="text-secondary-900">{totalItems}</strong> món ăn
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-secondary-500">Sắp xếp:</span>
           <SortSelect options={[...SORT_OPTIONS]} />

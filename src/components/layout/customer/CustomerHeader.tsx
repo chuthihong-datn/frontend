@@ -3,13 +3,22 @@
 import Link from "next/link";
 import { Search, ShoppingCart, User, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 
 export default function CustomerHeader() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const { itemCount } = useCartStore();
   const { user, logout } = useAuthStore();
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      router.push(`/menu?search=${encodeURIComponent(searchQuery)}`);
+      setSearchQuery("");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/50 backdrop-blur-md border-b border-border shadow-sm">
@@ -32,6 +41,7 @@ export default function CustomerHeader() {
                 placeholder="Tìm kiếm món ăn bạn yêu thích..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearch}
                 className="w-full pl-9 pr-4 py-2 text-sm bg-primary-50 border rounded-full outline-none border-primary/30 focus:bg-white focus:ring-2 focus:ring-primary/20 focus:shadow-inner transition-all"
               />
             </div>
@@ -78,9 +88,9 @@ export default function CustomerHeader() {
             {user ? (
               <div className="relative group">
                 <button className="flex items-center gap-2 p-1 hover:bg-secondary-50 rounded-xl transition-colors">
-                  {user.avatar ? (
+                  {user.avtUrl ? (
                     <img
-                      src={user.avatar}
+                      src={user.avtUrl}
                       alt={user.name}
                       className="w-8 h-8 rounded-full object-cover"
                     />
