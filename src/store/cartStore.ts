@@ -16,6 +16,7 @@ interface CartState {
     size?: ProductSize,
     toppings?: Topping[]
   ) => void
+  setCartFromServer: (items: CartItem[], subtotal: number) => void
   removeItem: (itemId: string) => void
   updateQuantity: (itemId: string, quantity: number) => void
   clearCart: () => void
@@ -88,6 +89,17 @@ export const useCartStore = create<CartState>()(
         const { shippingFee, discount } = get()
         set({
           items: newItems,
+          subtotal,
+          itemCount,
+          total: subtotal + shippingFee - discount,
+        })
+      },
+
+      setCartFromServer: (items, subtotal) => {
+        const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+        const { shippingFee, discount } = get()
+        set({
+          items,
           subtotal,
           itemCount,
           total: subtotal + shippingFee - discount,

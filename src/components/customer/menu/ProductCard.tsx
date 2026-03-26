@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import type { Product } from '@/types'
 import { formatPrice } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
+import { addToCartApi } from '@/api/cart'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_IMAGE =
@@ -46,18 +48,45 @@ export default function ProductCard({
   showSoldCount = false,
 }: ProductCardProps) {
   const addItem = useCartStore((state) => state.addItem)
+  const accessToken = useAuthStore((state) => state.accessToken)
   const firstImage = sanitizeImageSrc(product.images?.[0])
   const hasRating = Number(product.rating) > 0
   const [imageSrc, setImageSrc] = useState(firstImage)
+  const [isAdding, setIsAdding] = useState(false)
 
   useEffect(() => {
     setImageSrc(firstImage)
   }, [firstImage])
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
-    addItem(product)
-    toast.success(`Đã thêm ${product.name} vào giỏ hàng!`)
+
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng')
+      return
+    }
+
+    setIsAdding(true)
+    try {
+      await addToCartApi(
+        {
+          menuId: product.id,
+          menuSizeId: null,
+          quantity: 1,
+          toppingIds: [],
+        },
+        accessToken
+      )
+
+      addItem(product)
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1500 })
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || error?.message || 'Không thể thêm vào giỏ hàng'
+      )
+    } finally {
+      setIsAdding(false)
+    }
   }
 
   return (
@@ -103,8 +132,9 @@ export default function ProductCard({
             </div>
             <button
               onClick={handleAddToCart}
+              disabled={isAdding}
               className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center 
-                hover:bg-primary-600 active:scale-90 transition-all shadow-sm"
+                hover:bg-primary-600 active:scale-90 transition-all shadow-sm disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
             </button>

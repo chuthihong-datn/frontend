@@ -84,7 +84,28 @@ export interface Cart {
   total: number
   itemCount: number
 }
+ export interface AddToCartRequestPayload {
+  menuId: number
+  menuSizeId?: number | null
+  quantity: number
+  toppingIds: number[]
+}
 
+export interface CartItemResponse {
+  cartItemId: number
+  image: string
+  menuName: string
+  sizeName: string | null
+  toppings: string[]
+  quantity: number
+  price: number
+  itemTotal: number
+}
+
+export interface CartResponse {
+  items: CartItemResponse[]
+  totalAmount: number
+}
 // ============================================================
 // ORDER
 // ============================================================

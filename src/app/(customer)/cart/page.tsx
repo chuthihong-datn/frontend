@@ -1,20 +1,89 @@
 'use client'
 
-import { Minus, Plus, Trash2, Tag, ChevronRight } from 'lucide-react'
-import Image from 'next/image'
+import { useEffect, useState } from 'react'
+import { Minus, Plus, Trash2, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
+import { getCartApi } from '@/api/cart'
+import type { CartItemResponse } from '@/types'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
+import type { CartItem, Product, ProductSize, Topping } from '@/types'
+
+const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const product: Product = {
+    id: item.cartItemId,
+    name: item.menuName,
+    images: item.image ? [item.image] : [],
+    rating: 0,
+    minPrice: Number(item.price),
+  }
+
+  const size: ProductSize | undefined = item.sizeName
+    ? {
+        id: 0,
+        name: item.sizeName,
+        extraPrice: 0,
+      }
+    : undefined
+
+  const toppings: Topping[] = (item.toppings || []).map((name, index) => ({
+    id: index + 1,
+    name,
+    price: 0,
+  }))
+
+  return {
+    id: String(item.cartItemId),
+    product,
+    quantity: item.quantity,
+    size,
+    toppings,
+    subtotal: Number(item.itemTotal),
+  }
+}
 
 export default function CartPage() {
-  const { items, subtotal, shippingFee, discount, total, updateQuantity, removeItem } =
+  const [isLoadingCart, setIsLoadingCart] = useState(true)
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const { items, subtotal, shippingFee, discount, total, updateQuantity, removeItem, setCartFromServer } =
     useCartStore()
+
+  useEffect(() => {
+    const fetchCart = async () => {
+      if (!accessToken) {
+        setIsLoadingCart(false)
+        return
+      }
+
+      try {
+        const cart = await getCartApi(accessToken)
+        const mappedItems = (cart.items || []).map(mapServerItemToStoreItem)
+        setCartFromServer(mappedItems, Number(cart.totalAmount || 0))
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || error?.message || 'Khong the tai gio hang')
+      } finally {
+        setIsLoadingCart(false)
+      }
+    }
+
+    fetchCart()
+  }, [accessToken, setCartFromServer])
+
+  if (isLoadingCart) {
+    return (
+      <div className="container-page py-16 text-center text-secondary-600">
+        Đang tải giỏ hàng...
+      </div>
+    )
+  }
 
   if (items.length === 0) {
     return (
       <div className="container-page py-16 text-center">
         <span className="text-6xl block mb-4">🛒</span>
-        <h2 className="font-display text-2xl font-bold text-secondary-900 mb-2">
+        <h2 className="text-2xl font-bold text-secondary-900 mb-1">
           Giỏ hàng trống
         </h2>
         <p className="text-secondary-500 mb-6">Hãy thêm món ăn yêu thích vào giỏ hàng</p>
@@ -34,7 +103,7 @@ export default function CartPage() {
         <span className="text-secondary-900 font-medium">Giỏ hàng & Thanh toán</span>
       </nav>
 
-      <h1 className="font-display text-3xl font-bold text-secondary-900 mb-8">
+      <h1 className="text-3xl font-bold text-secondary-900 mb-1 pb-4">
         Xác Nhận Đơn Hàng
       </h1>
 
@@ -51,7 +120,7 @@ export default function CartPage() {
                 <div key={item.id} className="flex gap-4 pb-4 border-b border-border last:border-0 last:pb-0">
                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-secondary-100 shrink-0">
                     <img
-                      src={item.product.image}
+                      src={item.product.images?.[0] || '/images/pizza.png'}
                       alt={item.product.name}
                       className="w-full h-full object-cover"
                     />
@@ -59,7 +128,7 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-secondary-900 text-sm">{item.product.name}</p>
                     {item.size && (
-                      <p className="text-xs text-secondary-500">Size: {item.size.label}</p>
+                      <p className="text-xs text-secondary-500">Size: {item.size.name}</p>
                     )}
                     {item.toppings.length > 0 && (
                       <p className="text-xs text-secondary-500">

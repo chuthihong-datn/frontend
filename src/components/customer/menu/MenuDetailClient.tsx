@@ -3,8 +3,10 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
+import { addToCartApi } from '@/api/cart'
 import { ShoppingCart, Plus, Minus } from 'lucide-react'
-import type { ProductDetail, ProductSize, Topping } from '@/types'
+import type { ProductDetail, ProductSize } from '@/types'
 
 interface MenuDetailClientProps {
   product: ProductDetail
@@ -19,6 +21,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
   const [isAdding, setIsAdding] = useState(false)
 
   const { addItem } = useCartStore()
+  const accessToken = useAuthStore((state) => state.accessToken)
 
   // Calculate total price
   const totalPrice = useMemo(() => {
@@ -36,19 +39,36 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
   }, [product.minPrice, product.toppings, selectedSize, selectedToppings, quantity])
 
   const handleAddToCart = async () => {
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng')
+      return
+    }
+
     setIsAdding(true)
     try {
       const selectedToppingsList = product.toppings?.filter((t) =>
         selectedToppings.includes(t.id)
       ) || []
 
+      await addToCartApi(
+        {
+          menuId: product.id,
+          menuSizeId: selectedSize?.id ?? null,
+          quantity,
+          toppingIds: selectedToppings,
+        },
+        accessToken
+      )
+
       addItem(product, quantity, selectedSize || undefined, selectedToppingsList)
 
-      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`)
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1500 })
 
       // Reset after adding
       setQuantity(1)
       setSelectedToppings([])
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Không thể thêm vào giỏ hàng')
     } finally {
       setIsAdding(false)
     }
@@ -62,22 +82,6 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
 
   return (
     <div className="flex flex-col">
-      {/* Badge & Rating */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded uppercase">
-          Bán chạy
-        </span>
-        <div className="flex items-center gap-1 text-yellow-400">
-          {[...Array(5)].map((_, i) => (
-            <span key={i} className={i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-secondary-300'}>
-              ★
-            </span>
-          ))}
-          <span className="text-sm font-bold text-secondary-900 ml-1">{product.rating}</span>
-          <span className="text-sm text-secondary-500">({product.reviewCount}+ đánh giá)</span>
-        </div>
-      </div>
-
       {/* Product Name & Price */}
       <h1
         className="text-4xl font-bold text-secondary-900 mb-3 overflow-hidden"
@@ -85,7 +89,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
-          minHeight: '2.4em',
+          minHeight: '1.2em',
           lineHeight: 1.2,
         }}
       >
@@ -104,7 +108,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
-            minHeight: '3em',
+            minHeight: '1.5em',
             lineHeight: 1.5,
           }}
         >
