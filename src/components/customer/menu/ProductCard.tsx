@@ -51,6 +51,7 @@ export default function ProductCard({
   const accessToken = useAuthStore((state) => state.accessToken)
   const firstImage = sanitizeImageSrc(product.images?.[0])
   const hasRating = Number(product.rating) > 0
+  const isOutOfStock = product.outOfStock === true
   const [imageSrc, setImageSrc] = useState(firstImage)
   const [isAdding, setIsAdding] = useState(false)
 
@@ -61,8 +62,13 @@ export default function ProductCard({
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
 
+    if (isOutOfStock) {
+      toast.error('Sản phẩm này đã hết hàng')
+      return
+    }
+
     if (!accessToken) {
-      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng')
+      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng', { duration: 1500 })
       return
     }
 
@@ -90,7 +96,11 @@ export default function ProductCard({
   }
 
   return (
-    <Link href={`/menu/${product.id}`} className={cn('block group', className)}>
+    <Link 
+      href={isOutOfStock ? '#' : `/menu/${product.id}`} 
+      className={cn('block group', isOutOfStock && 'pointer-events-none', className)}
+      onClick={(e) => isOutOfStock && e.preventDefault()}
+    >
       <div className="card-hover overflow-hidden">
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-secondary-100">
@@ -101,10 +111,16 @@ export default function ProductCard({
             onError={() => setImageSrc(FALLBACK_IMAGE)}
             className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
+          {/* Out of Stock Text */}
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white text-xl font-semibold">Hết Hàng</span>
+            </div>
+          )}
         </div>
 
         {/* Content */}
-        <div className="p-3">
+        <div className={cn('p-3', isOutOfStock && 'opacity-60')}>
           <h3 className="font-semibold text-sm text-secondary-900 line-clamp-1 mb-1">
             {product.name}
           </h3>
@@ -132,7 +148,7 @@ export default function ProductCard({
             </div>
             <button
               onClick={handleAddToCart}
-              disabled={isAdding}
+              disabled={isAdding || isOutOfStock}
               className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center 
                 hover:bg-primary-600 active:scale-90 transition-all shadow-sm disabled:opacity-75 disabled:cursor-not-allowed"
             >

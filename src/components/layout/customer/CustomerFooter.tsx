@@ -11,7 +11,7 @@ export default function CustomerFooter() {
             <Link href="/" className="flex items-center gap-2 shrink-0 mb-4">
               <UtensilsCrossed strokeWidth={2} color="#f97316" />
               <span className="font-bold text-lg text-white">
-                FoodieDelivery
+                FoodyDelivery
               </span>
             </Link>
             <p className="text-sm leading-relaxed mb-4">
@@ -96,7 +96,7 @@ export default function CustomerFooter() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-secondary-700 text-center text-xs text-secondary-500">
-          © 2026 FoodieDelivery. Tất cả quyền được bảo lưu. Thiết kế bởi Hong Chu
+          © 2026 FoodyDelivery. Tất cả quyền được bảo lưu. Thiết kế bởi Hong Chu
         </div>
       </div>
     </footer>

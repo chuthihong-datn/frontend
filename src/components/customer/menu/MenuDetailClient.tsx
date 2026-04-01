@@ -40,7 +40,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
 
   const handleAddToCart = async () => {
     if (!accessToken) {
-      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng')
+      toast.error('Vui lòng đăng nhập để thêm món vào giỏ hàng', { duration: 1500 })
       return
     }
 
@@ -186,7 +186,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-            className="w-12 text-center font-bold text-lg border-none bg-transparent focus:outline-none"
+            className="no-spinner w-12 text-center font-bold text-lg border-none bg-transparent focus:outline-none"
           />
           <button
             onClick={() => setQuantity(quantity + 1)}

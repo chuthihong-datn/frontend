@@ -83,7 +83,7 @@ export default function RegisterPage() {
           <div className="flex items-center gap-2 mb-8">
             <UtensilsCrossed className="text-white" />
             <span className="font-bold text-2xl text-white">
-              FoodieDelivery
+              FoodyDelivery
             </span>
           </div>
           <h2 className="text-4xl font-bold text-white mb-3">

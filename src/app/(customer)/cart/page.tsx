@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { getCartApi } from '@/api/cart'
-import type { CartItemResponse } from '@/types'
+import { getCartApi, updateCartItemQuantityApi, deleteCartItemApi } from '@/api/cart'
+import { createOrderApi } from '@/api/order'
+import { getAllWardDeliveryApi } from '@/api/ward'
+import type { CartItemResponse, WardResponse } from '@/types'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
@@ -46,9 +48,41 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
 
 export default function CartPage() {
   const [isLoadingCart, setIsLoadingCart] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false)
+  const [isLoadingWards, setIsLoadingWards] = useState(false)
+  const [wards, setWards] = useState<WardResponse[]>([])
+  const [selectedWardId, setSelectedWardId] = useState('')
+  const [deliveryInfo, setDeliveryInfo] = useState({ fullName: '', phone: '' })
+  const [addressDetail, setAddressDetail] = useState('')
+  const [note, setNote] = useState('')
+  const [voucherCode, setVoucherCode] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({
+    fullName: '',
+    phone: '',
+    ward: '',
+    addressDetail: '',
+  })
+  const [paymentMethod, setPaymentMethod] = useState<'vnpay' | 'momo' | 'cash'>('vnpay')
+  const user = useAuthStore((state) => state.user)
   const accessToken = useAuthStore((state) => state.accessToken)
-  const { items, subtotal, shippingFee, discount, total, updateQuantity, removeItem, setCartFromServer } =
+  const { items, subtotal, shippingFee, discount, total, setCartFromServer, setShippingFee, clearCart } =
     useCartStore()
+
+  const userFullName = ((user as any)?.name || (user as any)?.fullName || '').trim()
+  const userPhone = String((user as any)?.phone || (user as any)?.phoneNumber || '').trim()
+  const checkoutButtonLabel = paymentMethod === 'cash' ? 'Đặt hàng' : 'Thanh toán ngay'
+  const selectedWard = wards.find((ward) => String(ward.wardId) === selectedWardId)
+  const paymentMethodLabel =
+    paymentMethod === 'vnpay' ? 'VNPay' : paymentMethod === 'momo' ? 'Ví điện tử' : 'Tiền mặt'
+
+  useEffect(() => {
+    setDeliveryInfo((prev) => ({
+      fullName: prev.fullName || userFullName,
+      phone: prev.phone || userPhone,
+    }))
+  }, [userFullName, userPhone])
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -70,6 +104,143 @@ export default function CartPage() {
 
     fetchCart()
   }, [accessToken, setCartFromServer])
+
+  useEffect(() => {
+    const fetchWards = async () => {
+      setIsLoadingWards(true)
+      try {
+        const data = await getAllWardDeliveryApi()
+        setWards(data)
+
+        if (data.length > 0) {
+          setSelectedWardId(String(data[0].wardId))
+          setShippingFee(Number(data[0].shippingFee || 0))
+        }
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || error?.message || 'Khong the tai danh sach phuong xa')
+      } finally {
+        setIsLoadingWards(false)
+      }
+    }
+
+    fetchWards()
+  }, [setShippingFee])
+
+  const handleWardChange = (wardId: string) => {
+    setSelectedWardId(wardId)
+    setFieldErrors((prev) => ({ ...prev, ward: '' }))
+    const selectedWard = wards.find((ward) => String(ward.wardId) === wardId)
+
+    if (!selectedWard) {
+      return
+    }
+
+    setShippingFee(Number(selectedWard.shippingFee || 0))
+  }
+
+  const handleCheckout = () => {
+    const nextErrors = {
+      fullName: deliveryInfo.fullName.trim() ? '' : 'Mục này là bắt buộc',
+      phone: deliveryInfo.phone.trim() ? '' : 'Mục này là bắt buộc',
+      ward: selectedWardId ? '' : 'Mục này là bắt buộc',
+      addressDetail: addressDetail.trim() ? '' : 'Mục này là bắt buộc',
+    }
+
+    setFieldErrors(nextErrors)
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc')
+      return
+    }
+
+    setShowCheckoutConfirm(true)
+  }
+
+  const handleConfirmCheckout = async () => {
+    if (isCheckingOut) {
+      return
+    }
+
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập')
+      return
+    }
+
+    const mappedPaymentMethod: 'VNPAY' | 'MOMO' | 'CASH' =
+      paymentMethod === 'vnpay'
+        ? 'VNPAY'
+        : paymentMethod === 'momo'
+          ? 'MOMO'
+          : 'CASH'
+
+    try {
+      setIsCheckingOut(true)
+      setShowCheckoutConfirm(false)
+
+      const orderResponse = await createOrderApi(
+        {
+          paymentMethod: mappedPaymentMethod,
+          fullName: deliveryInfo.fullName.trim(),
+          phone: deliveryInfo.phone.trim(),
+          wardId: Number(selectedWardId),
+          addressDetail: addressDetail.trim(),
+          note: note.trim() || undefined,
+          voucherCode: voucherCode.trim() || undefined,
+        },
+        accessToken
+      )
+
+      if (orderResponse.paymentUrl) {
+        toast.success('Dang chuyen den cong thanh toan VNPay...')
+        window.location.href = orderResponse.paymentUrl
+        return
+      }
+
+      clearCart()
+      toast.success(orderResponse.message || 'Dat hang thanh cong')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Khong the dat hang')
+    } finally {
+      setIsCheckingOut(false)
+    }
+  }
+
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập')
+      return
+    }
+
+    setIsUpdating(true)
+    try {
+      const updatedCart = await updateCartItemQuantityApi(itemId, newQuantity, accessToken)
+      const mappedItems = (updatedCart.items || []).map(mapServerItemToStoreItem)
+      setCartFromServer(mappedItems, Number(updatedCart.totalAmount || 0))
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Khong the cap nhat')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleRemoveItem = async (itemId: string) => {
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập')
+      return
+    }
+
+    setIsUpdating(true)
+    try {
+      const updatedCart = await deleteCartItemApi(itemId, accessToken)
+      const mappedItems = (updatedCart.items || []).map(mapServerItemToStoreItem)
+      setCartFromServer(mappedItems, Number(updatedCart.totalAmount || 0))
+      toast.success('Đã xóa khỏi giỏ hàng', { duration: 1000 })
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Khong the xoa')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   if (isLoadingCart) {
     return (
@@ -95,7 +266,8 @@ export default function CartPage() {
   }
 
   return (
-    <div className="container-page py-8">
+    <>
+      <div className="container-page py-8">
       {/* Breadcrumb */}
       <nav className="text-sm text-secondary-500 mb-6">
         <Link href="/">Trang chủ</Link>
@@ -113,7 +285,7 @@ export default function CartPage() {
           {/* Cart Items */}
           <div className="card p-6">
             <h2 className="font-semibold text-secondary-900 mb-4 flex items-center gap-2">
-              🛒 Món ăn đã chọn
+              Món ăn đã chọn
             </h2>
             <div className="space-y-4">
               {items.map((item) => (
@@ -138,15 +310,17 @@ export default function CartPage() {
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          disabled={isUpdating}
+                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-sm font-semibold w-5 text-center">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          disabled={isUpdating}
+                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -154,8 +328,9 @@ export default function CartPage() {
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-primary text-sm">{formatPrice(item.subtotal)}</span>
                         <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-secondary-400 hover:text-error transition-colors"
+                          onClick={() => handleRemoveItem(item.id)}
+                          disabled={isUpdating}
+                          className="text-secondary-400 hover:text-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -174,26 +349,87 @@ export default function CartPage() {
             </h2>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-secondary-600 mb-1">Họ và tên</label>
-                <input className="input" placeholder="Nguyễn Văn A" />
+                <label className="block text-sm text-secondary-600 mb-1">
+                  Họ và tên <span className="text-error">*</span>
+                </label>
+                <input
+                  className={`input ${fieldErrors.fullName ? 'border-error' : ''}`}
+                  placeholder="Nguyễn Văn A"
+                  value={deliveryInfo.fullName}
+                  onChange={(event) => {
+                    setDeliveryInfo((prev) => ({ ...prev, fullName: event.target.value }))
+                    setFieldErrors((prev) => ({ ...prev, fullName: '' }))
+                  }}
+                />
+                {fieldErrors.fullName && (
+                  <p className="text-error text-xs mt-1">{fieldErrors.fullName}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm text-secondary-600 mb-1">Số điện thoại</label>
-                <input className="input" placeholder="0901234567" />
+                <label className="block text-sm text-secondary-600 mb-1">
+                  Số điện thoại <span className="text-error">*</span>
+                </label>
+                <input
+                  className={`input ${fieldErrors.phone ? 'border-error' : ''}`}
+                  placeholder="0901234567"
+                  value={deliveryInfo.phone}
+                  onChange={(event) => {
+                    setDeliveryInfo((prev) => ({ ...prev, phone: event.target.value }))
+                    setFieldErrors((prev) => ({ ...prev, phone: '' }))
+                  }}
+                />
+                {fieldErrors.phone && (
+                  <p className="text-error text-xs mt-1">{fieldErrors.phone}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm text-secondary-600 mb-1">Phường/Xã</label>
-                <select className="input">
-                  <option>Chọn phường/xã...</option>
+                <label className="block text-sm text-secondary-600 mb-1">
+                  Phường/Xã <span className="text-error">*</span>
+                </label>
+                <select
+                  className={`input ${fieldErrors.ward ? 'border-error' : ''}`}
+                  value={selectedWardId}
+                  onChange={(event) => handleWardChange(event.target.value)}
+                  disabled={isLoadingWards || wards.length === 0}
+                >
+                  <option value="">
+                    {isLoadingWards ? 'Dang tai phuong/xa...' : 'Chọn phường/xã...'}
+                  </option>
+                  {wards.map((ward) => (
+                    <option key={ward.wardId} value={String(ward.wardId)}>
+                      {ward.name}
+                    </option>
+                  ))}
                 </select>
+                {fieldErrors.ward && (
+                  <p className="text-error text-xs mt-1">{fieldErrors.ward}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm text-secondary-600 mb-1">Địa chỉ cụ thể</label>
-                <input className="input" placeholder="Số nhà, đường ABC..." />
+                <label className="block text-sm text-secondary-600 mb-1">
+                  Địa chỉ cụ thể <span className="text-error">*</span>
+                </label>
+                <input
+                  className={`input ${fieldErrors.addressDetail ? 'border-error' : ''}`}
+                  placeholder="Số nhà, đường ABC..."
+                  value={addressDetail}
+                  onChange={(event) => {
+                    setAddressDetail(event.target.value)
+                    setFieldErrors((prev) => ({ ...prev, addressDetail: '' }))
+                  }}
+                />
+                {fieldErrors.addressDetail && (
+                  <p className="text-error text-xs mt-1">{fieldErrors.addressDetail}</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm text-secondary-600 mb-1">Ghi chú</label>
-                <textarea className="input resize-none h-20" placeholder="Ghi chú cho tài xế và của hàng..." />
+                <textarea
+                  className="input resize-none h-20"
+                  placeholder="Ghi chú cho tài xế và của hàng..."
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -213,7 +449,14 @@ export default function CartPage() {
                   key={method.id}
                   className="flex items-center gap-2 p-3 border border-border rounded-xl cursor-pointer hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-50"
                 >
-                  <input type="radio" name="payment" value={method.id} className="accent-primary" />
+                  <input
+                    type="radio"
+                    name="payment"
+                    value={method.id}
+                    checked={paymentMethod === method.id}
+                    onChange={() => setPaymentMethod(method.id as 'vnpay' | 'momo' | 'cash')}
+                    className="accent-primary"
+                  />
                   <span className="text-base">{method.icon}</span>
                   <span className="text-sm font-medium">{method.label}</span>
                 </label>
@@ -227,8 +470,19 @@ export default function CartPage() {
           <div className="card p-6 sticky top-24">
             <h2 className="font-semibold text-secondary-900 mb-4">Mã giảm giá</h2>
             <div className="flex gap-2 mb-6">
-              <input className="input flex-1 text-sm" placeholder="FOODIESS" />
-              <button className="btn-primary btn-md shrink-0">Áp dụng</button>
+              <input
+                className="input flex-1 text-sm"
+                placeholder="FOODIESS"
+                value={voucherCode}
+                onChange={(event) => setVoucherCode(event.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-primary btn-md shrink-0"
+                onClick={() => toast.info('Ma giam gia se duoc ap dung khi dat hang')}
+              >
+                Áp dụng
+              </button>
             </div>
 
             <h2 className="font-semibold text-secondary-900 mb-4">Tóm tắt đơn hàng</h2>
@@ -253,13 +507,94 @@ export default function CartPage() {
               </div>
             </div>
 
-            <button className="btn-primary btn-lg w-full mt-6 flex items-center justify-center gap-2">
-              Thanh toán ngay
+            <button
+              onClick={handleCheckout}
+              disabled={isCheckingOut}
+              className="btn-primary btn-lg w-full mt-6 flex items-center justify-center gap-2"
+            >
+              {isCheckingOut ? 'Dang xu ly...' : checkoutButtonLabel}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {showCheckoutConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-border overflow-hidden">
+            <div className="px-5 py-4 border-b border-border bg-primary-50">
+              <h3 className="text-lg font-bold text-secondary-900">Xác nhận đặt hàng</h3>
+              <p className="text-sm text-secondary-600 mt-1">
+                Vui lòng kiểm tra thông tin trước khi đặt hàng.
+              </p>
+            </div>
+
+            <div className="p-5 space-y-4 text-sm">
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Người nhận</span>
+                <span className="col-span-2 font-medium text-secondary-900 break-words">
+                  {deliveryInfo.fullName}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Số điện thoại</span>
+                <span className="col-span-2 font-medium text-secondary-900 break-words">
+                  {deliveryInfo.phone}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Khu vực</span>
+                <span className="col-span-2 font-medium text-secondary-900 break-words">
+                  {selectedWard?.name || '--'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Địa chỉ</span>
+                <span className="col-span-2 font-medium text-secondary-900 break-words">
+                  {addressDetail}
+                </span>
+              </div>
+              {note.trim() && (
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-secondary-500">Ghi chú</span>
+                  <span className="col-span-2 text-secondary-700 break-words">{note}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Thanh toán</span>
+                <span className="col-span-2 font-medium text-secondary-900">{paymentMethodLabel}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-secondary-500">Tổng tiền</span>
+                <span className="col-span-2 text-lg font-bold text-primary">{formatPrice(total)}</span>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-border bg-secondary-50 flex gap-3 justify-end">
+              <button
+                type="button"
+                className="btn-outline btn-md"
+                onClick={() => {
+                  setShowCheckoutConfirm(false)
+                  toast.info('Ban da huy dat hang')
+                }}
+                disabled={isCheckingOut}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-primary btn-md"
+                onClick={handleConfirmCheckout}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? 'Dang xu ly...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

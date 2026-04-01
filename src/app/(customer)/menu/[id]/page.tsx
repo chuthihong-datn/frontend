@@ -8,7 +8,7 @@ interface MenuDetailPageProps {
 }
 
 export const metadata: Metadata = {
-  title: 'Chi Tiết Sản Phẩm - FoodieDelivery',
+  title: 'Chi Tiết Sản Phẩm - FoodyDelivery',
   description: 'Xem chi tiết món ăn và đặt hàng',
 }
 

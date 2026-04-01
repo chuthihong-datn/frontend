@@ -14,6 +14,7 @@ export interface Product {
   rating: number
   minPrice: number
   totalSold?: number
+  outOfStock?: boolean
 }
 
 export interface ProductDetail {
@@ -28,6 +29,7 @@ export interface ProductDetail {
   rating: number
   reviewCount: number
   reviews: Review[]
+  outOfStock?: boolean
 }
 
 export interface ProductSize {
@@ -62,7 +64,8 @@ export function mapToProductDetail(item: any): ProductDetail {
     toppings: item.toppings || [],
     rating: item.rating,
     reviewCount: item.reviewCount,
-    reviews: item.reviews || []
+    reviews: item.reviews || [],
+    outOfStock: item.outOfStock || false
   }
 }
 
@@ -105,6 +108,13 @@ export interface CartItemResponse {
 export interface CartResponse {
   items: CartItemResponse[]
   totalAmount: number
+}
+
+export interface WardResponse {
+  wardId: number
+  name: string
+  isDelivery: boolean
+  shippingFee: number
 }
 // ============================================================
 // ORDER
@@ -214,6 +224,7 @@ export interface LoginResponse {
   fullName: string
   token: string
   email: string
+  phone: string
   role: string
 }
 

@@ -2,16 +2,51 @@
 
 import Link from "next/link";
 import { Search, ShoppingCart, User, UtensilsCrossed } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCartApi } from "@/api/cart";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
+import type { CartItem, CartItemResponse, Product, ProductSize, Topping } from "@/types";
+
+const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const product: Product = {
+    id: item.cartItemId,
+    name: item.menuName,
+    images: item.image ? [item.image] : [],
+    rating: 0,
+    minPrice: Number(item.price),
+  };
+
+  const size: ProductSize | undefined = item.sizeName
+    ? {
+        id: 0,
+        name: item.sizeName,
+        extraPrice: 0,
+      }
+    : undefined;
+
+  const toppings: Topping[] = (item.toppings || []).map((name, index) => ({
+    id: index + 1,
+    name,
+    price: 0,
+  }));
+
+  return {
+    id: String(item.cartItemId),
+    product,
+    quantity: item.quantity,
+    size,
+    toppings,
+    subtotal: Number(item.itemTotal),
+  };
+};
 
 export default function CustomerHeader() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const { itemCount } = useCartStore();
-  const { user, logout } = useAuthStore();
+  const { itemCount, clearCart, setCartFromServer } = useCartStore();
+  const { user, logout, accessToken } = useAuthStore();
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
@@ -19,6 +54,31 @@ export default function CustomerHeader() {
       setSearchQuery("");
     }
   };
+
+  const handleLogout = () => {
+    logout();
+    clearCart();
+    router.push('/');
+  };
+
+  useEffect(() => {
+    const syncCart = async () => {
+      if (!accessToken) {
+        clearCart();
+        return;
+      }
+
+      try {
+        const cart = await getCartApi(accessToken);
+        const mappedItems = (cart.items || []).map(mapServerItemToStoreItem);
+        setCartFromServer(mappedItems, Number(cart.totalAmount || 0));
+      } catch {
+        clearCart();
+      }
+    };
+
+    syncCart();
+  }, [accessToken, clearCart, setCartFromServer]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/50 backdrop-blur-md border-b border-border shadow-sm">
@@ -28,7 +88,7 @@ export default function CustomerHeader() {
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <UtensilsCrossed strokeWidth={2} color="#f97316" />
             <span className="font-bold text-lg text-secondary-900">
-              FoodieDelivery
+              FoodyDelivery
             </span>
           </Link>
 
@@ -122,7 +182,7 @@ export default function CustomerHeader() {
                       Tài khoản
                     </Link>
                     <button
-                      onClick={logout}
+                      onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-error hover:bg-red-50 rounded-xl"
                     >
                       Đăng xuất

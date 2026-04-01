@@ -6,12 +6,48 @@ import { Eye, EyeOff, Mail, Lock, UtensilsCrossed } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
+import { useCartStore } from '@/store/cartStore'
 import { loginApi} from '@/api/auth'
-import { UserRole } from '@/types'
+import { getCartApi } from '@/api/cart'
+import { UserRole, type CartItem, type Product, type ProductSize, type Topping, type CartItemResponse } from '@/types'
+
+const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const product: Product = {
+    id: item.cartItemId,
+    name: item.menuName,
+    images: item.image ? [item.image] : [],
+    rating: 0,
+    minPrice: Number(item.price),
+  }
+
+  const size: ProductSize | undefined = item.sizeName
+    ? {
+        id: 0,
+        name: item.sizeName,
+        extraPrice: 0,
+      }
+    : undefined
+
+  const toppings: Topping[] = (item.toppings || []).map((name, index) => ({
+    id: index + 1,
+    name,
+    price: 0,
+  }))
+
+  return {
+    id: String(item.cartItemId),
+    product,
+    quantity: item.quantity,
+    size,
+    toppings,
+    subtotal: Number(item.itemTotal),
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter()
   const setUser = useAuthStore((state) => state.setUser)
+  const setCartFromServer = useCartStore((state) => state.setCartFromServer)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
@@ -29,11 +65,20 @@ export default function LoginPage() {
           id: res.id,
           name: res.fullName,
           email: res.email,
+          phone: res.phone ? String(res.phone) : '',
           role: role,
           createdAt: new Date().toISOString(),
         },
         res.token
       )
+
+      try {
+        const cart = await getCartApi(res.token)
+        const mappedItems = (cart.items || []).map(mapServerItemToStoreItem)
+        setCartFromServer(mappedItems, Number(cart.totalAmount || 0))
+      } catch {
+        setCartFromServer([], 0)
+      }
 
       toast.success("Đăng nhập thành công!", { duration: 2000 })
 
@@ -64,7 +109,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 flex flex-col justify-end p-12">
           <div className="flex items-center gap-2 mb-8">
             <UtensilsCrossed strokeWidth={2} className='text-white' />
-            <span className="font-bold text-2xl text-white">FoodieDelivery</span>
+            <span className="font-bold text-2xl text-white">FoodyDelivery</span>
           </div>
           <h2 className="text-4xl font-bold text-white mb-3">
             Giao hàng tận nơi,<br />Món ngon tận hưởng

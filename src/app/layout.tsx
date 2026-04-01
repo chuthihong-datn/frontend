@@ -20,12 +20,12 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: {
-    default: 'FoodieDelivery – Giao hàng tận nơi',
-    template: '%s | FoodieDelivery',
+    default: 'FoodyDelivery – Giao hàng tận nơi',
+    template: '%s | FoodyDelivery',
   },
   description:
-    'Đặt món ăn ngon, giao hàng nhanh chóng và chất lượng nhất. FoodieDelivery – kết nối bạn với những nhà hàng tốt nhất trong khu vực.',
-  keywords: ['đặt đồ ăn', 'giao hàng thức ăn', 'food delivery', 'FoodieDelivery'],
+    'Đặt món ăn ngon, giao hàng nhanh chóng và chất lượng nhất. FoodyDelivery – kết nối bạn với những nhà hàng tốt nhất trong khu vực.',
+  keywords: ['đặt đồ ăn', 'giao hàng thức ăn', 'food delivery', 'FoodyDelivery'],
   icons: {
     icon: '/favicon.ico',
   },

@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (isLoading) => set({ isLoading }),
     }),
     {
-      name: 'foodie-auth',
+      name: 'foody-auth',
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

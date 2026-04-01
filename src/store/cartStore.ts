@@ -21,6 +21,7 @@ interface CartState {
   updateQuantity: (itemId: string, quantity: number) => void
   clearCart: () => void
   applyVoucher: (discount: number) => void
+  setShippingFee: (shippingFee: number) => void
 }
 
 function calcItemSubtotal(
@@ -150,9 +151,14 @@ export const useCartStore = create<CartState>()(
         const { subtotal, shippingFee } = get()
         set({ discount, total: subtotal + shippingFee - discount })
       },
+
+      setShippingFee: (shippingFee) => {
+        const { subtotal, discount } = get()
+        set({ shippingFee, total: subtotal + shippingFee - discount })
+      },
     }),
     {
-      name: 'foodie-cart',
+      name: 'foody-cart',
     }
   )
 )

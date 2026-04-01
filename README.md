@@ -8,7 +8,7 @@ Dự án food delivery được xây dựng với **Next.js 14 App Router**, **T
 
 ```bash
 # Clone hoặc copy project
-cd foodie-delivery
+cd foody-delivery
 
 # Cài dependencies
 npm install

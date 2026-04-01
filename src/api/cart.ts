@@ -46,3 +46,46 @@ export const getCartApi = async (accessToken: string): Promise<CartResponse> => 
 
   return response.data as CartResponse
 }
+
+export const updateCartItemQuantityApi = async (
+  itemId: string | number,
+  quantity: number,
+  accessToken: string
+): Promise<CartResponse> => {
+  const response = await apiClient.put<CartApiPayload>(`/cart/items/${itemId}`, { quantity }, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (response.data && typeof response.data === 'object' && 'success' in response.data && response.data.success === false) {
+    throw new Error(response.data.message || 'Khong the cap nhat gio hang')
+  }
+
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data
+  }
+
+  return response.data as CartResponse
+}
+
+export const deleteCartItemApi = async (
+  itemId: string | number,
+  accessToken: string
+): Promise<CartResponse> => {
+  const response = await apiClient.delete<CartApiPayload>(`/cart/items/${itemId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (response.data && typeof response.data === 'object' && 'success' in response.data && response.data.success === false) {
+    throw new Error(response.data.message || 'Khong the xoa khoi gio hang')
+  }
+
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data
+  }
+
+  return response.data as CartResponse
+}

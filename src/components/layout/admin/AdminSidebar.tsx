@@ -41,7 +41,7 @@ export default function AdminSidebar() {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <span className="text-primary text-lg">🍴</span>
-            <span className="font-display font-bold text-white text-sm">FoodieAdmin</span>
+            <span className="font-display font-bold text-white text-sm">FoodyAdmin</span>
           </div>
         )}
         <button
@@ -88,7 +88,7 @@ export default function AdminSidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">Admin</p>
-              <p className="text-xs text-secondary-400 truncate">admin@foodie.com</p>
+              <p className="text-xs text-secondary-400 truncate">admin@foody.com</p>
             </div>
           )}
         </div>
