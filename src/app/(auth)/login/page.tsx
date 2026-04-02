@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { loginApi} from '@/api/auth'
 import { getCartApi } from '@/api/cart'
+import { getProfile } from '@/api/user'
 import { UserRole, type CartItem, type Product, type ProductSize, type Topping, type CartItemResponse } from '@/types'
 
 const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
@@ -66,11 +67,31 @@ export default function LoginPage() {
           name: res.fullName,
           email: res.email,
           phone: res.phone ? String(res.phone) : '',
+          avtUrl: res.avtUrl,
           role: role,
           createdAt: new Date().toISOString(),
         },
         res.token
       )
+
+      // Sync profile right after login so header/avatar has freshest data immediately.
+      try {
+        const profile = await getProfile()
+        setUser(
+          {
+            id: Number(profile.accountId),
+            name: profile.fullName,
+            email: profile.email,
+            phone: profile.phone,
+            avtUrl: profile.avtUrl,
+            role,
+            createdAt: profile.createdAt ?? new Date().toISOString(),
+          },
+          res.token
+        )
+      } catch {
+        // Keep login flow smooth even if profile endpoint is temporarily unavailable.
+      }
 
       try {
         const cart = await getCartApi(res.token)

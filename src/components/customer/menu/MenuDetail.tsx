@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import { getProductDetailApi } from '@/api/menu'
 import { Star } from 'lucide-react'
 import MenuDetailClient from './MenuDetailClient'
@@ -9,8 +10,11 @@ interface MenuDetailProps {
 
 export default async function MenuDetail({ productId }: MenuDetailProps) {
   const product: ProductDetail = await getProductDetailApi(productId)
+  const isOutOfStock = product.outOfStock === true || Number(product.amount) <= 0
 
-  if (!product || !product.id) {
+  if (!product || !product.id || isOutOfStock) {
+    notFound()
+
     return (
       <div className="container-page py-8">
         <p className="text-center text-secondary-500">Không tìm thấy sản phẩm</p>

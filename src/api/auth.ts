@@ -1,4 +1,4 @@
-import apiClient from "./index"
+import apiClient from "@/lib/api"
 import { LoginRequest, LoginResponse } from "@/types/index"
 import { RegisterRequest, RegisterResponse } from "@/types/index"
 

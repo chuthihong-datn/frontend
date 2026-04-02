@@ -1,4 +1,4 @@
-import apiClient from './index'
+import apiClient from '@/lib/api'
 
 type BackendPaymentMethod = 'VNPAY' | 'MOMO' | 'CASH'
 

@@ -1,4 +1,4 @@
-import apiClient from './index'
+import apiClient from '@/lib/api'
 import type { Product, ProductDetail } from '@/types'
 
 export const getMenusApi = async (): Promise<Product[]> => {

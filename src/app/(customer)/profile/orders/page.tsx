@@ -4,7 +4,27 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { User, ClipboardList, Tag, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { formatPrice } from '@/lib/utils'
 import Pagination from '@/components/shared/Pagination'
+
+const MOCK_ORDERS = [
+  { id: '#FOOD-12345', date: '10/05/2023', status: 'shipping', total: 315000 },
+  { id: '#FOOD-12340', date: '18/10/2023', status: 'delivered', total: 210000 },
+  { id: '#FOOD-12339', date: '16/10/2023', status: 'delivered', total: 189000 },
+  { id: '#FOOD-12338', date: '11/10/2023', status: 'cancelled', total: 99000 },
+  { id: '#FOOD-12337', date: '09/10/2023', status: 'delivered', total: 125000 },
+  { id: '#FOOD-12336', date: '08/10/2023', status: 'shipping', total: 450000 },
+  { id: '#FOOD-12335', date: '06/10/2023', status: 'delivered', total: 225000 },
+  { id: '#FOOD-12334', date: '04/10/2023', status: 'delivered', total: 78000 },
+  { id: '#FOOD-12333', date: '02/10/2023', status: 'cancelled', total: 133000 },
+  { id: '#FOOD-12332', date: '01/10/2023', status: 'delivered', total: 205000 },
+]
+
+const STATUS_MAP: Record<string, { label: string; class: string }> = {
+  shipping: { label: 'Đang giao', class: 'status-shipping' },
+  delivered: { label: 'Hoàn thành', class: 'status-delivered' },
+  cancelled: { label: 'Đã hủy', class: 'status-cancelled' },
+}
 
 const SIDEBAR_ITEMS = [
   { id: 'profile', label: 'Thông tin cá nhân', icon: User, href: '/profile' },
@@ -12,58 +32,7 @@ const SIDEBAR_ITEMS = [
   { id: 'vouchers', label: 'Voucher của tôi', icon: Tag, href: '/voucher' },
 ]
 
-const MOCK_VOUCHERS = [
-  {
-    id: 'VOUCHER-001',
-    code: 'GIAM50K',
-    description: 'Giảm 50.000đ cho đơn từ 500.000đ',
-    expiresAt: '20/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-002',
-    code: 'FREESHIP15K',
-    description: 'Freeship tối đa 15.000đ cho đơn từ 50.000đ',
-    expiresAt: '22/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-003',
-    code: 'NEWUSER30',
-    description: 'Giảm 30% cho đơn đầu tiên (tối đa 40.000đ)',
-    expiresAt: '25/03/2026',
-    status: 'used',
-  },
-  {
-    id: 'VOUCHER-004',
-    code: 'COMBO20',
-    description: 'Giảm 20.000đ khi mua combo bất kỳ',
-    expiresAt: '15/03/2026',
-    status: 'expired',
-  },
-  {
-    id: 'VOUCHER-005',
-    code: 'LUNCH25',
-    description: 'Giảm 25.000đ khung giờ trưa 10:30 - 13:30',
-    expiresAt: '28/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-006',
-    code: 'WEEKEND35',
-    description: 'Giảm 35.000đ cho đơn cuối tuần',
-    expiresAt: '30/03/2026',
-    status: 'available',
-  },
-]
-
-const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  available: { label: 'Khả dụng', class: 'status-delivered' },
-  used: { label: 'Đã dùng', class: 'status-shipping' },
-  expired: { label: 'Hết hạn', class: 'status-cancelled' },
-}
-
-export default function VoucherPage() {
+export default function OrderHistoryPage() {
   const { logout } = useAuthStore()
   const router = useRouter()
 
@@ -85,7 +54,7 @@ export default function VoucherPage() {
                     key={item.id}
                     href={item.href}
                     className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                      item.id === 'vouchers'
+                      item.id === 'orders'
                         ? 'bg-primary-50 text-primary font-medium'
                         : 'text-secondary-700 hover:bg-secondary-100'
                     }`}
@@ -108,12 +77,12 @@ export default function VoucherPage() {
 
         <div className="lg:col-span-3">
           <div className="card p-6">
-            <h2 className="font-semibold text-secondary-900 mb-5">Voucher của tôi</h2>
+            <h2 className="font-semibold text-secondary-900 mb-5">Lịch sử đặt hàng</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['Mã voucher', 'Mô tả', 'Hạn sử dụng', 'Trạng thái', 'Thao tác'].map((h) => (
+                    {['Mã đơn hàng', 'Ngày đặt', 'Trạng thái', 'Tổng tiền', 'Thao tác'].map((h) => (
                       <th key={h} className="text-left py-3 px-2 text-secondary-500 font-medium whitespace-nowrap">
                         {h}
                       </th>
@@ -121,18 +90,18 @@ export default function VoucherPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_VOUCHERS.map((voucher) => (
-                    <tr key={voucher.id} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
-                      <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{voucher.code}</td>
-                      <td className="py-3 px-2 text-secondary-600 min-w-[280px]">{voucher.description}</td>
-                      <td className="py-3 px-2 text-secondary-600">{voucher.expiresAt}</td>
+                  {MOCK_ORDERS.map((order, i) => (
+                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
+                      <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{order.id}</td>
+                      <td className="py-3 px-2 text-secondary-600">{order.date}</td>
                       <td className="py-3 px-2">
-                        <span className={STATUS_MAP[voucher.status]?.class ?? 'badge'}>
-                          {STATUS_MAP[voucher.status]?.label}
+                        <span className={STATUS_MAP[order.status]?.class ?? 'badge'}>
+                          {STATUS_MAP[order.status]?.label}
                         </span>
                       </td>
+                      <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.total)}</td>
                       <td className="py-3 px-2">
-                        <button className="text-primary hover:underline text-xs font-medium">Chi tiết</button>
+                        <button className="text-primary hover:underline text-xs font-medium">Xem</button>
                       </td>
                     </tr>
                   ))}
@@ -140,7 +109,7 @@ export default function VoucherPage() {
               </table>
             </div>
             <div className="mt-6">
-              <Pagination page={1} totalPages={3} />
+              <Pagination page={1} totalPages={8} />
             </div>
           </div>
         </div>

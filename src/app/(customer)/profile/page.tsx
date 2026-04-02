@@ -1,15 +1,22 @@
 'use client'
 
-import { User, ClipboardList, Tag, LogOut, Edit3, ChevronRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { User, ClipboardList, Tag, LogOut, Edit3 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { formatPrice, formatDate } from '@/lib/utils'
-import Pagination from '@/components/shared/Pagination'
+import { formatPrice } from '@/lib/utils'
+import EditProfileModal from '@/components/customer/profile/EditProfileModal'
+import { getProfile } from '@/api/user'
 
 const MOCK_ORDERS = [
   { id: '#FOOD-12345', date: '10/05/2023', status: 'shipping', total: 315000 },
   { id: '#FOOD-12340', date: '18/10/2023', status: 'delivered', total: 210000 },
   { id: '#FOOD-12345', date: '25/10/2023', status: 'delivered', total: 188000 },
   { id: '#FOOD-12340', date: '14/05/2023', status: 'delivered', total: 210000 },
+  { id: '#FOOD-12338', date: '11/04/2023', status: 'cancelled', total: 99000 },
+  { id: '#FOOD-12331', date: '02/04/2023', status: 'delivered', total: 275000 },
+  { id: '#FOOD-12320', date: '28/03/2023', status: 'shipping', total: 149000 },
 ]
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
@@ -19,12 +26,49 @@ const STATUS_MAP: Record<string, { label: string; class: string }> = {
 }
 
 const SIDEBAR_ITEMS = [
-  { id: 'orders', label: 'Lịch sử đặt hàng', icon: ClipboardList },
-  { id: 'vouchers', label: 'Voucher của tôi', icon: Tag },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: User, href: '/profile' },
+  { id: 'orders', label: 'Lịch sử đặt hàng', icon: ClipboardList, href: '/profile/orders' },
+  { id: 'vouchers', label: 'Voucher của tôi', icon: Tag, href: '/voucher' },
 ]
 
 export default function ProfilePage() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, setUser, accessToken } = useAuthStore()
+  const router = useRouter()
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const userRole = user?.role ?? 'customer'
+  const fallbackCreatedAt = user?.createdAt ?? new Date().toISOString()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/')
+  }
+
+  // Fetch profile data on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!accessToken) return
+      try {
+        const profile = await getProfile()
+        setUser(
+          {
+            id: Number(profile.accountId),
+            name: profile.fullName,
+            email: profile.email,
+            phone: profile.phone,
+            avtUrl: profile.avtUrl,
+            role: userRole,
+            createdAt: profile.createdAt ?? fallbackCreatedAt,
+          },
+          accessToken
+        )
+      } catch (error: any) {
+        console.error('Error fetching profile:', error)
+        // Silently fail - user data is already in store
+      }
+    }
+
+    fetchProfile()
+  }, [accessToken, fallbackCreatedAt, setUser, userRole])
 
   return (
     <div className="container-page py-8">
@@ -32,38 +76,26 @@ export default function ProfilePage() {
         {/* Sidebar */}
         <div className="lg:col-span-1">
           <div className="card p-5">
-            {/* Avatar */}
-            <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-              <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
-                {user?.avtUrl ? (
-                  <img src={user.avtUrl} alt={user.name} className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <span className="text-primary font-bold text-lg">
-                    {(user?.name ?? 'U')[0].toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-secondary-900 truncate">{user?.name ?? 'Người dùng'}</p>
-                <p className="text-xs text-secondary-500 truncate">{user?.email}</p>
-              </div>
-            </div>
-
             <nav className="space-y-1">
               {SIDEBAR_ITEMS.map((item) => {
                 const Icon = item.icon
                 return (
-                  <button
+                  <Link
                     key={item.id}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-secondary-700 hover:bg-secondary-100 transition-colors"
+                    href={item.href}
+                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                      item.id === 'profile'
+                        ? 'bg-primary-50 text-primary font-medium'
+                        : 'text-secondary-700 hover:bg-secondary-100'
+                    }`}
                   >
                     <Icon className="w-4 h-4" />
                     {item.label}
-                  </button>
+                  </Link>
                 )
               })}
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-error hover:bg-red-50 transition-colors mt-2"
               >
                 <LogOut className="w-4 h-4" />
@@ -78,16 +110,23 @@ export default function ProfilePage() {
           {/* Profile Header */}
           <div className="card p-6 flex items-center gap-6">
             <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center">
-              <span className="text-primary font-bold text-3xl">
-                {(user?.name ?? 'U')[0].toUpperCase()}
-              </span>
+              {user?.avtUrl ? (
+                <img src={user.avtUrl} alt={user.name} className="w-full h-full rounded-2xl object-cover" />
+              ) : (
+                <span className="text-primary font-bold text-3xl">
+                  {(user?.name ?? 'U')[0].toUpperCase()}
+                </span>
+              )}
             </div>
             <div className="flex-1">
-              <h2 className="font-display text-2xl font-bold text-secondary-900">{user?.name}</h2>
+              <h2 className="font-semibold text-2xl text-secondary-900">{user?.name}</h2>
               <p className="text-secondary-500 text-sm mt-1">✉️ {user?.email}</p>
               {user?.phone && <p className="text-secondary-500 text-sm">📞 {user.phone}</p>}
             </div>
-            <button className="btn-primary btn-md flex items-center gap-2">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="btn-primary btn-md flex items-center gap-2"
+            >
               <Edit3 className="w-4 h-4" />
               Chỉnh sửa hồ sơ
             </button>
@@ -95,7 +134,12 @@ export default function ProfilePage() {
 
           {/* Order History */}
           <div className="card p-6">
-            <h2 className="font-semibold text-secondary-900 mb-5">Lịch sử đặt hàng</h2>
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 className="font-semibold text-secondary-900">Đơn đặt gần đây</h2>
+              <Link href="/profile/orders" className="text-primary text-sm font-medium hover:underline">
+                Xem tất cả
+              </Link>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -108,7 +152,7 @@ export default function ProfilePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_ORDERS.map((order, i) => (
+                  {MOCK_ORDERS.slice(0, 5).map((order, i) => (
                     <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
                       <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{order.id}</td>
                       <td className="py-3 px-2 text-secondary-600">{order.date}</td>
@@ -126,12 +170,20 @@ export default function ProfilePage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-6">
-              <Pagination page={1} totalPages={8} />
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        user={user}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => {
+          // Refetch profile after successful update
+          setIsEditModalOpen(false)
+        }}
+      />
     </div>
   )
 }

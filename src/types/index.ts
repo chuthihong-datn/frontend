@@ -225,6 +225,7 @@ export interface LoginResponse {
   token: string
   email: string
   phone: string
+  avtUrl?: string
   role: string
 }
 
