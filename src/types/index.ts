@@ -171,6 +171,25 @@ export interface OrderStatusHistory {
   note?: string
 }
 
+type BackendPaymentMethod = 'VNPAY' | 'MOMO' | 'CASH'
+
+export interface CreateOrderRequest {
+  paymentMethod: BackendPaymentMethod
+  fullName: string
+  phone: string
+  wardId: number
+  addressDetail: string
+  note?: string
+  voucherCode?: string
+}
+
+export interface CreateOrderResponse {
+  orderId: number
+  paymentUrl?: string
+  message?: string
+}
+
+
 // ============================================================
 // VOUCHER
 // ============================================================
@@ -240,6 +259,20 @@ export interface RegisterResponse {
   success: boolean
   message: string
 }
+
+export interface ProfileUpdateRequest {
+  fullName?: string
+  phone?: string
+}
+
+export interface ProfileResponse {
+  accountId: number
+  fullName: string
+  email: string
+  phone: string
+  avtUrl: string
+  createdAt: string
+}
 // ============================================================
 // API RESPONSE
 // ============================================================
@@ -270,4 +303,83 @@ export interface ProductFilter {
   sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'
   page?: number
   limit?: number
+}
+
+// ============================================================
+// ADMIN / CATEGORY
+// ============================================================
+
+export type AdminCategoryRequest = {
+  name: string
+  description: string
+  isActive: boolean
+}
+
+export type AdminCategoryResponse = {
+  categoryId: string | number
+  name: string
+  description: string
+  iconUrl: string | null
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+// ============================================================
+// ADMIN / TOPPING
+// ============================================================
+
+export type AdminToppingRequest = {
+  toppingId?: string | number
+  name: string
+  price: number
+  isActive: boolean
+  outOfStock: boolean
+}
+
+export type AdminToppingResponse = {
+  toppingId: string | number
+  name: string
+  price: number
+  isActive: boolean
+  outOfStock: boolean
+}
+
+// ============================================================
+// ADMIN / MENU
+// ============================================================
+
+export type AdminMenuSizeRequest = {
+  sizeName: string
+  extraPrice: number
+}
+
+export type AdminMenuRequest = {
+  categoryId: string | number
+  name: string
+  description: string
+  basePrice: number
+  amount: number
+  outOfStock: boolean
+  toppingIds: Array<string | number>
+  sizes: AdminMenuSizeRequest[]
+}
+
+export type AdminMenuSizeResponse = {
+  sizeName: string
+  extraPrice: number
+}
+
+export type AdminMenuResponse = {
+  menuId: string | number
+  name: string
+  description: string
+  basePrice: number
+  amount: number
+  isActive: boolean
+  outOfStock: boolean
+  images: string[]
+  categoryName: string
+  toppings: string[]
+  sizes: AdminMenuSizeResponse[]
 }

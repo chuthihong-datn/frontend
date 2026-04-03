@@ -4,25 +4,29 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
-  ShoppingBag,
+  Shapes,
+  UtensilsCrossed,
+  Sandwich,
+  MapPinned,
   ClipboardList,
+  TicketPercent,
+  Star,
   Users,
-  Tag,
-  Settings,
   ChevronLeft,
-  BarChart3,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/orders', label: 'Đơn hàng', icon: ClipboardList },
-  { href: '/products', label: 'Sản phẩm', icon: ShoppingBag },
-  { href: '/users', label: 'Người dùng', icon: Users },
-  { href: '/vouchers', label: 'Voucher', icon: Tag },
-  { href: '/analytics', label: 'Phân tích', icon: BarChart3 },
-  { href: '/settings', label: 'Cài đặt', icon: Settings },
+  { href: '/categories', label: 'Quản lý danh mục', icon: Shapes },
+  { href: '/menus', label: 'Quản lý món ăn', icon: UtensilsCrossed },
+  { href: '/toppings', label: 'Quản lý topping', icon: Sandwich },
+  { href: '/delivery-addresses', label: 'Quản lý địa chỉ giao hàng', icon: MapPinned },
+  { href: '/orders', label: 'Quản lý đơn hàng', icon: ClipboardList },
+  { href: '/vouchers', label: 'Quản lý khuyến mãi & Voucher', icon: TicketPercent },
+  { href: '/reviews', label: 'Quản lý đánh giá', icon: Star },
+  { href: '/accounts', label: 'Quản lý tài khoản', icon: Users },
 ]
 
 export default function AdminSidebar() {

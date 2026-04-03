@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { loginApi} from '@/api/auth'
+import { loginApi } from '@/api/auth'
 import { getCartApi } from '@/api/cart'
 import { getProfile } from '@/api/user'
 import { UserRole, type CartItem, type Product, type ProductSize, type Topping, type CartItemResponse } from '@/types'
@@ -104,7 +104,7 @@ export default function LoginPage() {
       toast.success("Đăng nhập thành công!", { duration: 2000 })
 
       if (role === 'admin') {
-        router.push('/admin')
+        router.push('/dashboard')
       } else {
         router.push('/')
       }

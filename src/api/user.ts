@@ -1,30 +1,12 @@
 import apiClient from '@/lib/api'
+import type { ProfileResponse, ProfileUpdateRequest } from '@/types'
 
-export interface ProfileUpdateRequest {
-  fullName?: string
-  phone?: string
-}
 
-export interface ProfileResponse {
-  accountId: number
-  fullName: string
-  email: string
-  phone: string
-  avtUrl: string
-  createdAt: string
-}
-
-/**
- * Fetch user profile
- */
 export const getProfile = async (): Promise<ProfileResponse> => {
   const response = await apiClient.get('/user/profile')
   return response.data
 }
 
-/**
- * Update user profile with optional avatar file
- */
 export const updateProfile = async (
   request: ProfileUpdateRequest,
   file?: File

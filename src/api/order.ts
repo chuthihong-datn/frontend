@@ -1,25 +1,8 @@
 import apiClient from '@/lib/api'
-
-type BackendPaymentMethod = 'VNPAY' | 'MOMO' | 'CASH'
-
-export interface CreateOrderRequest {
-  paymentMethod: BackendPaymentMethod
-  fullName: string
-  phone: string
-  wardId: number
-  addressDetail: string
-  note?: string
-  voucherCode?: string
-}
+import type { CreateOrderRequest, CreateOrderResponse } from '@/types'
 
 interface ApiErrorResponse {
   success?: boolean
-  message?: string
-}
-
-export interface CreateOrderResponse {
-  orderId: number
-  paymentUrl?: string
   message?: string
 }
 

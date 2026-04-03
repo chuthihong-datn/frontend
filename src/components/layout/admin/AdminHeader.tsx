@@ -5,12 +5,15 @@ import { usePathname } from 'next/navigation'
 
 const routeTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
+  '/categories': 'Quản lý danh mục',
+  '/menus': 'Quản lý món ăn',
+  '/topping': 'Quản lý topping',
+  '/delivery-addresses': 'Quản lý địa chỉ giao hàng',
   '/orders': 'Quản lý đơn hàng',
-  '/products': 'Quản lý sản phẩm',
-  '/users': 'Quản lý người dùng',
-  '/vouchers': 'Quản lý Voucher',
-  '/analytics': 'Phân tích dữ liệu',
-  '/settings': 'Cài đặt hệ thống',
+  '/products': 'Quản lý món ăn',
+  '/vouchers': 'Quản lý khuyến mãi & Voucher',
+  '/reviews': 'Quản lý đánh giá',
+  '/accounts': 'Quản lý tài khoản',
 }
 
 export default function AdminHeader() {
