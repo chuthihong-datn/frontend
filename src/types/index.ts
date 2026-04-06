@@ -204,6 +204,48 @@ export interface CreateOrderResponse {
   message?: string
 }
 
+export type AdminOrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'DELIVERING'
+  | 'COMPLETED'
+  | 'CANCELLED'
+
+export type AdminPaymentStatus =
+  | 'UNPAID'
+  | 'PENDING'
+  | 'PAID'
+  | 'FAILED'
+  | 'REFUNDED'
+  | string
+
+export type AdminOrderItemResponse = {
+  menuName: string
+  sizeName: string | null
+  toppings: string[]
+  quantity: number
+  itemTotal: number
+}
+
+export type AdminOrderResponse = {
+  orderId: number | string
+  customerName: string
+  phone: string
+  address: string
+  wardName: string
+  totalAmount: number
+  shippingFee: number
+  finalAmount: number
+  orderStatus: AdminOrderStatus
+  paymentStatus: AdminPaymentStatus
+  createdAt: string
+  items: AdminOrderItemResponse[]
+}
+
+export type UpdateAdminOrderStatusRequest = {
+  orderStatus: AdminOrderStatus
+}
+
 
 // ============================================================
 // VOUCHER

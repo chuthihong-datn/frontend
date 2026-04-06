@@ -647,7 +647,7 @@ export default function AdminMenusPage() {
 					<input
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Tìm theo tên, danh mục hoặc topping"
+						placeholder="Tìm theo tên món ăn hoặc danh mục"
 						className="input sm:w-80"
 					/>
 				</div>

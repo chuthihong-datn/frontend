@@ -1,5 +1,10 @@
 import apiClient from '@/lib/api'
-import type { CreateOrderRequest, CreateOrderResponse } from '@/types'
+import type {
+  AdminOrderResponse,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  UpdateAdminOrderStatusRequest,
+} from '@/types'
 
 interface ApiErrorResponse {
   success?: boolean
@@ -32,4 +37,24 @@ export const createOrderApi = async (
   }
 
   return response.data as CreateOrderResponse
+}
+
+export const getAdminOrdersApi = async (): Promise<AdminOrderResponse[]> => {
+  const response = await apiClient.get<AdminOrderResponse[]>('/admin/orders')
+  return response.data
+}
+
+export const getAdminOrderDetailApi = async (
+  id: number | string
+): Promise<AdminOrderResponse> => {
+  const response = await apiClient.get<AdminOrderResponse>(`/admin/orders/${id}`)
+  return response.data
+}
+
+export const updateAdminOrderStatusApi = async (
+  id: number | string,
+  payload: UpdateAdminOrderStatusRequest
+): Promise<AdminOrderResponse> => {
+  const response = await apiClient.put<AdminOrderResponse>(`/admin/orders/${id}/status`, payload)
+  return response.data
 }

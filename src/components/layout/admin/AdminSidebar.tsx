@@ -19,11 +19,11 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/orders', label: 'Quản lý đơn hàng', icon: ClipboardList },
   { href: '/categories', label: 'Quản lý danh mục', icon: Shapes },
   { href: '/menus', label: 'Quản lý món ăn', icon: UtensilsCrossed },
   { href: '/toppings', label: 'Quản lý topping', icon: Sandwich },
   { href: '/delivery-address', label: 'Quản lý địa chỉ giao hàng', icon: MapPinned },
-  { href: '/orders', label: 'Quản lý đơn hàng', icon: ClipboardList },
   { href: '/vouchers', label: 'Quản lý khuyến mãi & Voucher', icon: TicketPercent },
   { href: '/reviews', label: 'Quản lý đánh giá', icon: Star },
   { href: '/accounts', label: 'Quản lý tài khoản', icon: Users },
