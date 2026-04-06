@@ -39,6 +39,7 @@ type Menu = {
 	amount: number
 	status: MenuStatus
 	outOfStock: boolean
+	deleted: boolean
 	images: string[]
 	categoryName: string
 	toppings: string[]
@@ -76,7 +77,6 @@ type MenuFormValues = {
 	basePrice: string
 	amount: string
 	status: MenuStatus
-	outOfStock: boolean
 	toppingIds: number[]
 	sizes: MenuSizeForm[]
 }
@@ -107,7 +107,6 @@ const EMPTY_FORM: MenuFormValues = {
 	basePrice: '',
 	amount: '1',
 	status: 'active',
-	outOfStock: false,
 	toppingIds: [],
 	sizes: [EMPTY_SIZE],
 }
@@ -148,6 +147,7 @@ function mapApiMenu(item: AdminMenuResponse): Menu {
 		amount: Number(item.amount),
 		status: item.isActive ? 'active' : 'inactive',
 		outOfStock: item.outOfStock ?? false,
+		deleted: item.deleted ?? false,
 		images: item.images ?? [],
 		categoryName: item.categoryName ?? '',
 		toppings: item.toppings ?? [],
@@ -262,7 +262,6 @@ function buildPayload(values: MenuFormValues): AdminMenuRequest {
 		description: values.description.trim(),
 		basePrice: Number(values.basePrice),
 		amount: Number(values.amount),
-		outOfStock: values.outOfStock,
 		toppingIds: values.toppingIds,
 		sizes: values.sizes
 			.filter((size) => !isBlankSizeRow(size))
@@ -288,24 +287,30 @@ export default function AdminMenusPage() {
 	const [formErrors, setFormErrors] = useState<MenuFormErrors>({})
 	const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 	const [imagePreviews, setImagePreviews] = useState<string[]>([])
+	const [existingImageCount, setExistingImageCount] = useState(0)
 
-	const activeCount = useMemo(
-		() => allMenus.filter((item) => item.status === 'active').length,
+	const visibleMenus = useMemo(
+		() => allMenus.filter((item) => !item.deleted),
 		[allMenus]
 	)
-	const inactiveCount = allMenus.length - activeCount
+
+	const activeCount = useMemo(
+		() => visibleMenus.filter((item) => item.status === 'active').length,
+		[visibleMenus]
+	)
+	const inactiveCount = visibleMenus.length - activeCount
 	const outOfStockCount = useMemo(
-		() => allMenus.filter((item) => item.outOfStock).length,
-		[allMenus]
+		() => visibleMenus.filter((item) => item.outOfStock).length,
+		[visibleMenus]
 	)
 
 	const filteredMenus = useMemo(() => {
 		const keyword = query.trim().toLowerCase()
 		if (!keyword) {
-			return allMenus
+			return visibleMenus
 		}
 
-		return allMenus.filter((menu) => {
+		return visibleMenus.filter((menu) => {
 			const text = [
 				menu.name,
 				menu.description,
@@ -316,7 +321,7 @@ export default function AdminMenusPage() {
 
 			return text.toLowerCase().includes(keyword)
 		})
-	}, [allMenus, query])
+	}, [visibleMenus, query])
 
 	const itemsPerPage = 10
 	const totalPages = Math.max(1, Math.ceil(filteredMenus.length / itemsPerPage))
@@ -379,6 +384,7 @@ export default function AdminMenusPage() {
 		setFormErrors({})
 		setSelectedFiles([])
 		setImagePreviews([])
+		setExistingImageCount(0)
 	}
 
 	const openCreateModal = () => {
@@ -390,6 +396,7 @@ export default function AdminMenusPage() {
 		setEditingMenu(null)
 		setSelectedFiles([])
 		setImagePreviews([])
+		setExistingImageCount(0)
 		setModalMode('create')
 	}
 
@@ -401,7 +408,6 @@ export default function AdminMenusPage() {
 			basePrice: String(menu.basePrice),
 			amount: String(menu.amount),
 			status: menu.status,
-			outOfStock: menu.outOfStock,
 			toppingIds: findToppingIdsByNames(menu.toppings, toppings),
 			sizes:
 				menu.sizes.length > 0
@@ -415,6 +421,7 @@ export default function AdminMenusPage() {
 		setEditingMenu(menu)
 		setSelectedFiles([])
 		setImagePreviews(menu.images)
+		setExistingImageCount(menu.images.length)
 		setModalMode('edit')
 	}
 
@@ -504,8 +511,8 @@ export default function AdminMenusPage() {
 
 		try {
 			const previews = await readFilesAsDataUrls(files)
-			setSelectedFiles(files)
-			setImagePreviews(previews)
+			setSelectedFiles((prev) => [...prev, ...files])
+			setImagePreviews((prev) => [...prev, ...previews])
 		} catch {
 			toast.error('Không thể tải ảnh. Vui lòng thử lại.')
 		} finally {
@@ -514,8 +521,13 @@ export default function AdminMenusPage() {
 	}
 
 	const removeSelectedImage = (index: number) => {
+		if (index < existingImageCount) {
+			return
+		}
+
+		const selectedFileIndex = index - existingImageCount
 		setImagePreviews((prev) => prev.filter((_, imageIndex) => imageIndex !== index))
-		setSelectedFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index))
+		setSelectedFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== selectedFileIndex))
 	}
 
 	const handleSubmit = async () => {
@@ -533,8 +545,10 @@ export default function AdminMenusPage() {
 
 			if (modalMode === 'create') {
 				const created = await createAdminMenuApi(payload, selectedFiles)
-				const mappedCreated = mapApiMenu(created)
-				setAllMenus((prev) => [mappedCreated, ...prev])
+				if (!created.deleted) {
+					const mappedCreated = mapApiMenu(created)
+					setAllMenus((prev) => [mappedCreated, ...prev])
+				}
 				toast.success('Thêm món ăn thành công.')
 				closeFormModal()
 				return
@@ -542,8 +556,12 @@ export default function AdminMenusPage() {
 
 			if (modalMode === 'edit' && editingMenu) {
 				const updated = await updateAdminMenuApi(editingMenu.id, payload, selectedFiles)
-				const mappedUpdated = mapApiMenu(updated)
-				setAllMenus((prev) => prev.map((item) => (item.id === editingMenu.id ? mappedUpdated : item)))
+				if (updated.deleted) {
+					setAllMenus((prev) => prev.filter((item) => item.id !== editingMenu.id))
+				} else {
+					const mappedUpdated = mapApiMenu(updated)
+					setAllMenus((prev) => prev.map((item) => (item.id === editingMenu.id ? mappedUpdated : item)))
+				}
 				toast.success('Cập nhật món ăn thành công.')
 				closeFormModal()
 			}
@@ -567,22 +585,12 @@ export default function AdminMenusPage() {
 			return
 		}
 
-		if (deletingMenu.status === 'inactive') {
-			toast.info('Món ăn này đã ở trạng thái tạm ẩn.')
-			setDeletingMenu(null)
-			return
-		}
-
 		setSubmitting(true)
 		try {
 			await deleteAdminMenuApi(deletingMenu.id)
-			setAllMenus((prev) =>
-				prev.map((item) =>
-					item.id === deletingMenu.id ? { ...item, status: 'inactive' as const } : item
-				)
-			)
+			setAllMenus((prev) => prev.filter((item) => item.id !== deletingMenu.id))
 			setDeletingMenu(null)
-			toast.success('Đã chuyển món ăn sang trạng thái tạm ẩn.')
+			toast.success('Xóa món ăn thành công.')
 		} catch (error: any) {
 			toast.error(error?.response?.data?.message || error?.message || 'Không thể cập nhật trạng thái món ăn')
 		} finally {
@@ -616,7 +624,7 @@ export default function AdminMenusPage() {
 				<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
 					<div className="rounded-xl border border-border p-3 bg-secondary-50">
 						<p className="text-xs text-secondary-500">Tổng món ăn</p>
-						<p className="text-2xl font-bold text-secondary-900">{allMenus.length}</p>
+						<p className="text-2xl font-bold text-secondary-900">{visibleMenus.length}</p>
 					</div>
 					<div className="rounded-xl border border-border p-3 bg-emerald-50">
 						<p className="text-xs text-emerald-700">Đang hoạt động</p>
@@ -627,7 +635,7 @@ export default function AdminMenusPage() {
 						<p className="text-2xl font-bold text-amber-700">{inactiveCount}</p>
 					</div>
 					<div className="rounded-xl border border-border p-3 bg-blue-50">
-						<p className="text-xs text-blue-700">Món hết hàng</p>
+						<p className="text-xs text-blue-700">Hết hàng</p>
 						<p className="text-2xl font-bold text-blue-700">{outOfStockCount}</p>
 					</div>
 				</div>
@@ -817,9 +825,11 @@ export default function AdminMenusPage() {
 						</div>
 
 						<div className="p-6 space-y-6 overflow-y-auto">
-							<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 								<div>
-									<label className="text-sm font-medium text-secondary-700">Danh mục *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Danh mục <span className="text-red-600">*</span>
+									</label>
 									<select
 										value={formValues.categoryId}
 										onChange={(event) => handleFieldChange('categoryId', event.target.value)}
@@ -839,43 +849,9 @@ export default function AdminMenusPage() {
 								</div>
 
 								<div>
-									<label className="text-sm font-medium text-secondary-700">Trạng thái</label>
-									<select
-										value={formValues.status}
-										onChange={(event) =>
-											setFormValues((prev) => ({
-												...prev,
-												status: event.target.value as MenuStatus,
-											}))
-										}
-										className="input mt-1"
-									>
-										<option value="active">Hoạt động</option>
-										<option value="inactive">Tạm ẩn</option>
-									</select>
-								</div>
-
-								<div>
-									<label className="text-sm font-medium text-secondary-700">Tình trạng hàng hóa</label>
-									<select
-										value={formValues.outOfStock ? 'out-of-stock' : 'in-stock'}
-										onChange={(event) =>
-											setFormValues((prev) => ({
-												...prev,
-												outOfStock: event.target.value === 'out-of-stock',
-											}))
-										}
-										className="input mt-1"
-									>
-										<option value="in-stock">Còn hàng</option>
-										<option value="out-of-stock">Hết hàng</option>
-									</select>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-								<div>
-									<label className="text-sm font-medium text-secondary-700">Tên món ăn *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Tên món ăn <span className="text-red-600">*</span>
+									</label>
 									<input
 										value={formValues.name}
 										onChange={(event) => handleFieldChange('name', event.target.value)}
@@ -884,9 +860,13 @@ export default function AdminMenusPage() {
 									/>
 									{formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name}</p>}
 								</div>
+							</div>
 
+							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 								<div>
-									<label className="text-sm font-medium text-secondary-700">Giá gốc (đ) *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Giá gốc (đ) <span className="text-red-600">*</span>
+									</label>
 									<input
 										type="number"
 										min={0}
@@ -899,11 +879,11 @@ export default function AdminMenusPage() {
 										<p className="text-xs text-red-600 mt-1">{formErrors.basePrice}</p>
 									)}
 								</div>
-							</div>
 
-							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 								<div>
-									<label className="text-sm font-medium text-secondary-700">Số lượng *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Số lượng <span className="text-red-600">*</span>
+									</label>
 									<input
 										type="number"
 										min={0}
@@ -913,41 +893,6 @@ export default function AdminMenusPage() {
 										placeholder="1"
 									/>
 									{formErrors.amount && <p className="text-xs text-red-600 mt-1">{formErrors.amount}</p>}
-								</div>
-
-								<div>
-									<label className="text-sm font-medium text-secondary-700">Ảnh món ăn</label>
-									<div className="mt-1 border border-dashed border-border rounded-2xl p-4 bg-secondary-50">
-										<div className="flex items-center gap-3">
-											<label className="btn btn-outline btn-sm cursor-pointer">
-												<ImagePlus className="w-4 h-4" />
-												Chọn ảnh
-												<input type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
-											</label>
-										</div>
-
-										{imagePreviews.length > 0 ? (
-											<div className="mt-3 grid grid-cols-3 gap-2">
-												{imagePreviews.map((src, index) => (
-													<div key={`${src}-${index}`} className="relative rounded-xl overflow-hidden border border-border bg-white aspect-square">
-														<img src={src} alt={`Ảnh ${index + 1}`} className="w-full h-full object-cover" />
-														{selectedFiles.length > 0 && (
-															<button
-																type="button"
-																onClick={() => removeSelectedImage(index)}
-																className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/80"
-																aria-label={`Xóa ảnh ${index + 1}`}
-															>
-																<X className="w-3.5 h-3.5" />
-															</button>
-														)}
-													</div>
-												))}
-											</div>
-										) : (
-											<p className="mt-3 text-xs text-secondary-400">Chưa có ảnh được chọn.</p>
-										)}
-									</div>
 								</div>
 							</div>
 
@@ -962,6 +907,45 @@ export default function AdminMenusPage() {
 								{formErrors.description && (
 									<p className="text-xs text-red-600 mt-1">{formErrors.description}</p>
 								)}
+							</div>
+
+							<div>
+								<label className="text-sm font-medium text-secondary-700">Ảnh món ăn</label>
+								<div className="mt-1 border border-dashed border-border rounded-2xl p-4 bg-secondary-50">
+									<div className="flex items-center gap-3">
+										<label className="btn btn-outline btn-sm cursor-pointer">
+											<ImagePlus className="w-4 h-4" />
+											Thêm ảnh
+											<input type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
+										</label>
+									</div>
+
+									{imagePreviews.length > 0 ? (
+										<div className="mt-3 flex flex-wrap gap-2">
+											{imagePreviews.map((src, index) => (
+												<div
+													key={`${src}-${index}`}
+													className="relative w-20 h-20 rounded-xl overflow-hidden border border-border bg-white"
+												>
+													<img src={src} alt={`Ảnh ${index + 1}`} className="w-full h-full object-cover" />
+													{index >= existingImageCount && (
+														<button
+															type="button"
+															onClick={() => removeSelectedImage(index)}
+															className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/80"
+															aria-label={`Xóa ảnh ${index + 1}`}
+														>
+															<X className="w-3.5 h-3.5" />
+														</button>
+													)}
+												</div>
+											))}
+										</div>
+									) : (
+										<p className="mt-3 text-xs text-secondary-400">Chưa có ảnh được chọn.</p>
+									)}
+									<p className="mt-2 text-xs text-secondary-500">Ảnh mới sẽ được thêm vào cuối danh sách.</p>
+								</div>
 							</div>
 
 							<div>
@@ -1054,21 +1038,6 @@ export default function AdminMenusPage() {
 															<p className="text-xs text-secondary-500">+{formatPrice(topping.price)}</p>
 														</div>
 													</div>
-													<div className="flex flex-col items-end gap-1">
-														<span
-															className={cn(
-																'badge text-xs',
-																topping.status === 'active'
-																	? 'bg-emerald-100 text-emerald-700'
-																	: 'bg-amber-100 text-amber-700'
-															)}
-														>
-															{topping.status === 'active' ? 'Hoạt động' : 'Tạm ẩn'}
-														</span>
-														{topping.outOfStock && (
-															<span className="badge bg-red-100 text-red-700 text-xs">Hết hàng</span>
-														)}
-													</div>
 												</label>
 											)
 										})}
@@ -1097,9 +1066,9 @@ export default function AdminMenusPage() {
 								<AlertTriangle className="w-5 h-5" />
 							</div>
 							<div>
-								<h3 className="text-lg font-semibold text-secondary-900">Xác nhận tạm ẩn món ăn</h3>
+								<h3 className="text-lg font-semibold text-secondary-900">Xác nhận xóa món ăn</h3>
 								<p className="text-sm text-secondary-500 mt-1">
-									Món ăn <strong>{deletingMenu.name}</strong> sẽ được chuyển sang trạng thái tạm ẩn và vẫn được giữ trong hệ thống.
+									Món ăn <strong>{deletingMenu.name}</strong> sẽ được xóa ra khỏi hệ thống.
 								</p>
 							</div>
 						</div>
@@ -1109,7 +1078,7 @@ export default function AdminMenusPage() {
 								Hủy bỏ
 							</button>
 							<button type="button" onClick={confirmDelete} disabled={submitting} className="btn btn-sm bg-red-600 text-white hover:bg-red-700">
-								Tạm ẩn
+								Xác nhận
 							</button>
 						</div>
 					</div>

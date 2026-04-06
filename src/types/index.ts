@@ -116,6 +116,21 @@ export interface WardResponse {
   isDelivery: boolean
   shippingFee: number
 }
+
+export type AdminWardResponse = {
+  wardId: number | string
+  wardCode: string
+  name: string
+  shippingFee: number
+  isDelivery: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type AdminWardRequest = {
+  shippingFee: number
+  isDelivery: boolean
+}
 // ============================================================
 // ORDER
 // ============================================================
@@ -360,7 +375,6 @@ export type AdminMenuRequest = {
   description: string
   basePrice: number
   amount: number
-  outOfStock: boolean
   toppingIds: Array<string | number>
   sizes: AdminMenuSizeRequest[]
 }
@@ -378,6 +392,7 @@ export type AdminMenuResponse = {
   amount: number
   isActive: boolean
   outOfStock: boolean
+  deleted: boolean
   images: string[]
   categoryName: string
   toppings: string[]

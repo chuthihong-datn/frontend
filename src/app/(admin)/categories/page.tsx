@@ -474,7 +474,7 @@ export default function AdminCategoriesPage() {
 													className="btn btn-sm bg-red-50 text-red-700 hover:bg-red-100"
 												>
 													<Trash2 className="w-4 h-4" />
-													Xóa
+													Tạm ẩn
 												</button>
 											</div>
 										</td>
@@ -502,7 +502,9 @@ export default function AdminCategoriesPage() {
 
 						<div className="p-6 space-y-4 overflow-y-auto">
 								<div>
-									<label className="text-sm font-medium text-secondary-700">Icon danh mục *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Icon danh mục <span className="text-red-500">*</span>
+									</label>
 									<div className="mt-2 flex items-start gap-3">
 										<div className="w-20 h-20 rounded-xl border border-dashed border-border bg-secondary-50 overflow-hidden flex items-center justify-center">
 											{formValues.iconUrl ? (
@@ -542,7 +544,9 @@ export default function AdminCategoriesPage() {
 								</div>
 
 							<div>
-								<label className="text-sm font-medium text-secondary-700">Tên danh mục *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Tên danh mục <span className="text-red-500">*</span>
+									</label>
 								<input
 									value={formValues.name}
 									onChange={(event) => onChangeField('name', event.target.value)}
@@ -553,7 +557,9 @@ export default function AdminCategoriesPage() {
 							</div>
 
 							<div>
-								<label className="text-sm font-medium text-secondary-700">Mô tả *</label>
+									<label className="text-sm font-medium text-secondary-700">
+										Mô tả <span className="text-red-500">*</span>
+									</label>
 								<textarea
 									value={formValues.description}
 									onChange={(event) => onChangeField('description', event.target.value)}
@@ -619,7 +625,7 @@ export default function AdminCategoriesPage() {
 							<div>
 								<h3 className="text-lg font-semibold text-secondary-900">Xác nhận chuyển trạng thái</h3>
 								<p className="text-sm text-secondary-500 mt-1">
-									Danh mục <strong>{deletingCategory.name}</strong> sẽ được chuyển sang trạng thái <strong>Tạm ẩn</strong>.
+									Danh mục <strong>{deletingCategory.name}</strong> và các menu trong danh mục sẽ được chuyển sang trạng thái <strong>Tạm ẩn</strong>.
 								</p>
 							</div>
 						</div>
