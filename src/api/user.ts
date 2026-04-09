@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api'
-import type { ProfileResponse, ProfileUpdateRequest } from '@/types'
+import type { ProfileResponse, ProfileUpdateRequest, OrderByUserResponse } from '@/types'
 
 
 export const getProfile = async (): Promise<ProfileResponse> => {
@@ -34,5 +34,15 @@ export const updateProfile = async (
     },
   })
 
+  return response.data
+}
+
+export const getMyOrders = async (): Promise<OrderByUserResponse[]> => {
+  const response = await apiClient.get<OrderByUserResponse[]>('/user/order')
+  return response.data
+}
+
+export const getMyOrderDetail = async (orderId: number | string): Promise<OrderByUserResponse> => {
+  const response = await apiClient.get<OrderByUserResponse>(`/user/order/${orderId}`)
   return response.data
 }

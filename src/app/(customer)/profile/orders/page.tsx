@@ -1,29 +1,20 @@
 'use client'
 
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { User, ClipboardList, Tag, LogOut } from 'lucide-react'
+import { User, ClipboardList, Tag, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
-import Pagination from '@/components/shared/Pagination'
-
-const MOCK_ORDERS = [
-  { id: '#FOOD-12345', date: '10/05/2023', status: 'shipping', total: 315000 },
-  { id: '#FOOD-12340', date: '18/10/2023', status: 'delivered', total: 210000 },
-  { id: '#FOOD-12339', date: '16/10/2023', status: 'delivered', total: 189000 },
-  { id: '#FOOD-12338', date: '11/10/2023', status: 'cancelled', total: 99000 },
-  { id: '#FOOD-12337', date: '09/10/2023', status: 'delivered', total: 125000 },
-  { id: '#FOOD-12336', date: '08/10/2023', status: 'shipping', total: 450000 },
-  { id: '#FOOD-12335', date: '06/10/2023', status: 'delivered', total: 225000 },
-  { id: '#FOOD-12334', date: '04/10/2023', status: 'delivered', total: 78000 },
-  { id: '#FOOD-12333', date: '02/10/2023', status: 'cancelled', total: 133000 },
-  { id: '#FOOD-12332', date: '01/10/2023', status: 'delivered', total: 205000 },
-]
+import { getMyOrders } from '@/api/user'
+import type { OrderByUserResponse } from '@/types'
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  shipping: { label: 'Đang giao', class: 'status-shipping' },
-  delivered: { label: 'Hoàn thành', class: 'status-delivered' },
-  cancelled: { label: 'Đã hủy', class: 'status-cancelled' },
+  PENDING: { label: 'Chờ xác nhận', class: 'status-pending' },
+  CONFIRMED: { label: 'Đã xác nhận', class: 'status-confirmed' },
+  DELIVERING: { label: 'Đang giao', class: 'status-shipping' },
+  COMPLETED: { label: 'Hoàn thành', class: 'status-delivered' },
+  CANCELLED: { label: 'Đã hủy', class: 'status-cancelled' },
 }
 
 const SIDEBAR_ITEMS = [
@@ -33,12 +24,81 @@ const SIDEBAR_ITEMS = [
 ]
 
 export default function OrderHistoryPage() {
-  const { logout } = useAuthStore()
+  const { logout, accessToken } = useAuthStore()
   const router = useRouter()
+  const [orders, setOrders] = useState<OrderByUserResponse[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const itemsPerPage = 10
 
   const handleLogout = () => {
     logout()
     router.push('/')
+  }
+
+  const formatOrderDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      return `${day}/${month}/${year}`
+    } catch {
+      return dateString
+    }
+  }
+
+  // Fetch orders on mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoadingOrders(true)
+      try {
+        const myOrders = await getMyOrders()
+        setOrders(myOrders)
+        setCurrentPage(1)
+      } catch (error: any) {
+        console.error('Error fetching orders:', error)
+        setOrders([])
+      } finally {
+        setLoadingOrders(false)
+      }
+    }
+
+    if (accessToken) {
+      fetchOrders()
+    }
+  }, [accessToken])
+
+  // Filter orders by status
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === 'ALL') {
+      return orders
+    }
+    return orders.filter((order) => order.orderStatus === statusFilter)
+  }, [orders, statusFilter])
+
+  // Paginate filtered orders
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredOrders.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredOrders, currentPage])
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const handlePageClick = (page: number) => {
+    setCurrentPage(page)
   }
 
   return (
@@ -78,39 +138,132 @@ export default function OrderHistoryPage() {
         <div className="lg:col-span-3">
           <div className="card p-6">
             <h2 className="font-semibold text-secondary-900 mb-5">Lịch sử đặt hàng</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    {['Mã đơn hàng', 'Ngày đặt', 'Trạng thái', 'Tổng tiền', 'Thao tác'].map((h) => (
-                      <th key={h} className="text-left py-3 px-2 text-secondary-500 font-medium whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MOCK_ORDERS.map((order, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
-                      <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{order.id}</td>
-                      <td className="py-3 px-2 text-secondary-600">{order.date}</td>
-                      <td className="py-3 px-2">
-                        <span className={STATUS_MAP[order.status]?.class ?? 'badge'}>
-                          {STATUS_MAP[order.status]?.label}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.total)}</td>
-                      <td className="py-3 px-2">
-                        <button className="text-primary hover:underline text-xs font-medium">Xem</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Status Filter */}
+            <div className="mb-6 flex items-center gap-3">
+              <label className="text-sm font-medium text-secondary-700">Lọc theo trạng thái:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="input-field px-3 py-2 text-sm border rounded-lg"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="PENDING">Chờ xác nhận</option>
+                <option value="CONFIRMED">Đã xác nhận</option>
+                <option value="DELIVERING">Đang giao</option>
+                <option value="COMPLETED">Hoàn thành</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
             </div>
-            <div className="mt-6">
-              <Pagination page={1} totalPages={8} />
-            </div>
+
+            {loadingOrders ? (
+              <div className="py-8 text-center text-secondary-500">Đang tải đơn hàng...</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="py-8 text-center text-secondary-500">Không có đơn hàng</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        {['Mã đơn hàng', 'Ngày đặt', 'Trạng thái', 'Tổng tiền', 'Thao tác'].map((h) => (
+                          <th key={h} className="text-left py-3 px-2 text-secondary-500 font-medium whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedOrders.map((order) => (
+                        <tr key={order.orderId} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
+                          <td className="py-3 px-2 font-mono font-semibold text-secondary-900">#{order.orderId}</td>
+                          <td className="py-3 px-2 text-secondary-600">{formatOrderDate(order.createdAt)}</td>
+                          <td className="py-3 px-2">
+                            <span className={STATUS_MAP[order.orderStatus]?.class ?? 'badge'}>
+                              {STATUS_MAP[order.orderStatus]?.label || order.orderStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.finalAmount)}</td>
+                          <td className="py-3 px-2">
+                            <button className="text-primary hover:underline text-xs font-medium">Xem chi tiết</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-secondary-600">
+                    Hiển thị {(currentPage - 1) * itemsPerPage + 1} đến {Math.min(currentPage * itemsPerPage, filteredOrders.length)} trong {filteredOrders.length} đơn hàng
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentPage === 1
+                          ? 'bg-secondary-100 text-secondary-400 cursor-not-allowed'
+                          : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                      }`}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+
+                    {/* Page number buttons */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
+                        const pageNum = index + 1
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageClick(pageNum)}
+                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-primary text-white'
+                                : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                      {totalPages > 5 && (
+                        <span className="px-2 py-1 text-secondary-500">...</span>
+                      )}
+                      {totalPages > 5 && (
+                        <button
+                          onClick={() => handlePageClick(totalPages)}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === totalPages
+                              ? 'bg-primary text-white'
+                              : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentPage === totalPages
+                          ? 'bg-secondary-100 text-secondary-400 cursor-not-allowed'
+                          : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
+                      }`}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

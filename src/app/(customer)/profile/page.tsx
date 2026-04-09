@@ -7,22 +7,15 @@ import { User, ClipboardList, Tag, LogOut, Edit3 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
 import EditProfileModal from '@/components/customer/profile/EditProfileModal'
-import { getProfile } from '@/api/user'
-
-const MOCK_ORDERS = [
-  { id: '#FOOD-12345', date: '10/05/2023', status: 'shipping', total: 315000 },
-  { id: '#FOOD-12340', date: '18/10/2023', status: 'delivered', total: 210000 },
-  { id: '#FOOD-12345', date: '25/10/2023', status: 'delivered', total: 188000 },
-  { id: '#FOOD-12340', date: '14/05/2023', status: 'delivered', total: 210000 },
-  { id: '#FOOD-12338', date: '11/04/2023', status: 'cancelled', total: 99000 },
-  { id: '#FOOD-12331', date: '02/04/2023', status: 'delivered', total: 275000 },
-  { id: '#FOOD-12320', date: '28/03/2023', status: 'shipping', total: 149000 },
-]
+import { getProfile, getMyOrders } from '@/api/user'
+import type { OrderByUserResponse } from '@/types'
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  shipping: { label: 'Đang giao', class: 'status-shipping' },
-  delivered: { label: 'Hoàn thành', class: 'status-delivered' },
-  cancelled: { label: 'Đã hủy', class: 'status-cancelled' },
+  PENDING: { label: 'Chờ xác nhận', class: 'status-pending' },
+  CONFIRMED: { label: 'Đã xác nhận', class: 'status-confirmed' },
+  DELIVERING: { label: 'Đang giao', class: 'status-shipping' },
+  COMPLETED: { label: 'Hoàn thành', class: 'status-delivered' },
+  CANCELLED: { label: 'Đã hủy', class: 'status-cancelled' },
 }
 
 const SIDEBAR_ITEMS = [
@@ -35,12 +28,26 @@ export default function ProfilePage() {
   const { user, logout, setUser, accessToken } = useAuthStore()
   const router = useRouter()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [orders, setOrders] = useState<OrderByUserResponse[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
   const userRole = user?.role ?? 'customer'
   const fallbackCreatedAt = user?.createdAt ?? new Date().toISOString()
 
   const handleLogout = () => {
     logout()
     router.push('/')
+  }
+
+  const formatOrderDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      return `${day}/${month}/${year}`
+    } catch {
+      return dateString
+    }
   }
 
   // Fetch profile data on mount
@@ -69,6 +76,26 @@ export default function ProfilePage() {
 
     fetchProfile()
   }, [accessToken, fallbackCreatedAt, setUser, userRole])
+
+  // Fetch orders data on mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoadingOrders(true)
+      try {
+        const myOrders = await getMyOrders()
+        setOrders(myOrders)
+      } catch (error: any) {
+        console.error('Error fetching orders:', error)
+        setOrders([])
+      } finally {
+        setLoadingOrders(false)
+      }
+    }
+
+    if (accessToken) {
+      fetchOrders()
+    }
+  }, [accessToken])
 
   return (
     <div className="container-page py-8">
@@ -152,21 +179,35 @@ export default function ProfilePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_ORDERS.slice(0, 5).map((order, i) => (
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
-                      <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{order.id}</td>
-                      <td className="py-3 px-2 text-secondary-600">{order.date}</td>
-                      <td className="py-3 px-2">
-                        <span className={STATUS_MAP[order.status]?.class ?? 'badge'}>
-                          {STATUS_MAP[order.status]?.label}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.total)}</td>
-                      <td className="py-3 px-2">
-                        <button className="text-primary hover:underline text-xs font-medium">Xem</button>
+                  {loadingOrders ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-secondary-500">
+                        Đang tải đơn hàng...
                       </td>
                     </tr>
-                  ))}
+                  ) : orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-secondary-500">
+                        Không có đơn hàng
+                      </td>
+                    </tr>
+                  ) : (
+                    orders.slice(0, 5).map((order) => (
+                      <tr key={order.orderId} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
+                        <td className="py-3 px-2 font-mono font-semibold text-secondary-900">#{order.orderId}</td>
+                        <td className="py-3 px-2 text-secondary-600">{formatOrderDate(order.createdAt)}</td>
+                        <td className="py-3 px-2">
+                          <span className={STATUS_MAP[order.orderStatus]?.class ?? 'badge'}>
+                            {STATUS_MAP[order.orderStatus]?.label}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.finalAmount)}</td>
+                        <td className="py-3 px-2">
+                          <button className="text-primary hover:underline text-xs font-medium">Xem chi tiết</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

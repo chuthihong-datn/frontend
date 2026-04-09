@@ -110,9 +110,18 @@ export default function LoginPage() {
       }
 
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message || 'Email hoặc mật khẩu không đúng'
-      )
+      const responseData = error?.response?.data
+      const backendMessage =
+        typeof responseData === 'string'
+          ? responseData
+          : responseData?.message || responseData?.error || ''
+
+      const normalizedMessage = String(backendMessage).toLowerCase()
+      if (normalizedMessage.includes('vô hiệu hóa') || normalizedMessage.includes('vo hieu hoa')) {
+        toast.error('Tài khoản đã bị vô hiệu hóa')
+      } else {
+        toast.error(backendMessage || 'Email hoặc mật khẩu không đúng')
+      }
     } finally {
       setIsLoading(false)
     }

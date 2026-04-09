@@ -330,6 +330,35 @@ export interface ProfileResponse {
   avtUrl: string
   createdAt: string
 }
+
+// ============================================================
+// USER / ORDER
+// ============================================================
+
+export type UserOrderStatus = 'PENDING' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED' | string
+export type UserPaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | string
+
+export type OrderByUserItemResponse = {
+  menuName: string
+  sizeName: string | null
+  toppings: string[]
+  quantity: number
+  itemTotal: number
+}
+
+export type OrderByUserResponse = {
+  orderId: number | string
+  address: string
+  wardName: string
+  totalAmount: number
+  shippingFee: number
+  finalAmount: number
+  orderStatus: UserOrderStatus
+  paymentStatus: UserPaymentStatus
+  createdAt: string
+  items: OrderByUserItemResponse[]
+}
+
 // ============================================================
 // API RESPONSE
 // ============================================================
@@ -378,6 +407,31 @@ export type AdminCategoryResponse = {
   description: string
   iconUrl: string | null
   isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+// ============================================================
+// ADMIN / ACCOUNT
+// ============================================================
+
+export type AdminAccountRole = 'ADMIN' | 'CUSTOMER' | string
+
+export type AdminAccountRequest = {
+  fullName: string
+  role: AdminAccountRole
+  avtUrl?: string
+}
+
+export type AdminAccountResponse = {
+  accountId: string | number
+  fullName: string
+  email: string
+  phone: string | null
+  password?: string | null
+  role: AdminAccountRole
+  isActive: boolean
+  avtUrl: string | null
   createdAt: string | null
   updatedAt: string | null
 }
