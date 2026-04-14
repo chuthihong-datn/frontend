@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Star, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Product } from '@/types'
+import type { CartItem, CartItemResponse, Product, ProductSize, Topping } from '@/types'
 import { formatPrice } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { addToCartApi } from '@/api/cart'
+import { getCartApi } from '@/api/cart'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_IMAGE =
@@ -36,6 +37,42 @@ function sanitizeImageSrc(src?: string): string {
   }
 }
 
+const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const product = {
+    id: item.menuId ?? item.cartItemId,
+    name: item.menuName,
+    images: item.image ? [item.image] : [],
+    rating: 0,
+    minPrice: Number(item.price),
+  }
+
+  const size: ProductSize | undefined = item.sizeName
+    ? {
+        id: 0,
+        name: item.sizeName,
+        extraPrice: 0,
+      }
+    : undefined
+
+  const toppings: Topping[] = (item.toppings || []).map((name, index) => ({
+    id: index + 1,
+    name,
+    price: 0,
+  }))
+
+  return {
+    id: String(item.cartItemId),
+    product,
+    quantity: item.quantity,
+    size,
+    toppings,
+    unitPrice: Number(item.price),
+    salePrice: typeof item.salePrice === 'number' ? Number(item.salePrice) : undefined,
+    isFlashSaleApplied: item.isFlashSaleApplied === true || item.flashSaleApplied === true,
+    subtotal: Number(item.itemTotal),
+  }
+}
+
 interface ProductCardProps {
   product: Product
   className?: string
@@ -47,11 +84,16 @@ export default function ProductCard({
   className,
   showSoldCount = false,
 }: ProductCardProps) {
-  const addItem = useCartStore((state) => state.addItem)
+  const setCartFromServer = useCartStore((state) => state.setCartFromServer)
   const accessToken = useAuthStore((state) => state.accessToken)
   const firstImage = sanitizeImageSrc(product.images?.[0])
   const hasRating = Number(product.rating) > 0
   const isOutOfStock = product.outOfStock === true
+  const hasFlashSale =
+    product.flashSale === true &&
+    typeof product.discountedPrice === 'number' &&
+    product.discountedPrice > 0 &&
+    product.discountedPrice < product.minPrice
   const [imageSrc, setImageSrc] = useState(firstImage)
   const [isAdding, setIsAdding] = useState(false)
 
@@ -84,8 +126,11 @@ export default function ProductCard({
         accessToken
       )
 
-      addItem(product)
-      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1500 })
+      const cart = await getCartApi(accessToken)
+      const mappedItems = (cart.items || []).map(mapServerItemToStoreItem)
+      setCartFromServer(mappedItems, Number(cart.totalAmount || 0))
+
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1000 })
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message || error?.message || 'Không thể thêm vào giỏ hàng'
@@ -104,6 +149,11 @@ export default function ProductCard({
       <div className="card-hover overflow-hidden">
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-secondary-100">
+          {hasFlashSale && typeof product.discountPercent === 'number' && product.discountPercent > 0 && (
+            <span className="absolute top-2 left-2 z-10 rounded-md bg-primary px-2 py-1 text-xs font-bold text-white shadow-sm">
+              -{product.discountPercent}%
+            </span>
+          )}
           <Image
             src={imageSrc}
             alt={product.name}
@@ -141,10 +191,26 @@ export default function ProductCard({
 
           {/* Price + Add */}
           <div className="flex items-center justify-between">
-            <div>
-              <span className="font-bold text-primary text-sm">
-                {formatPrice(product.minPrice)}
-              </span>
+            <div className="flex min-h-[2rem] flex-col justify-center">
+              {hasFlashSale ? (
+                <>
+                  <span className="font-bold text-primary text-sm">
+                    {formatPrice(product.discountedPrice!)}
+                  </span>
+                  <span className="text-xs text-secondary-500 line-through">
+                    {formatPrice(product.minPrice)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-primary text-sm">
+                    {formatPrice(product.minPrice)}
+                  </span>
+                  <span className="invisible text-xs">
+                    {formatPrice(product.minPrice)}
+                  </span>
+                </>
+              )}
             </div>
             <button
               onClick={handleAddToCart}

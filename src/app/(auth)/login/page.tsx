@@ -14,7 +14,7 @@ import { UserRole, type CartItem, type Product, type ProductSize, type Topping, 
 
 const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
   const product: Product = {
-    id: item.cartItemId,
+    id: item.menuId ?? item.cartItemId,
     name: item.menuName,
     images: item.image ? [item.image] : [],
     rating: 0,
@@ -41,6 +41,9 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
     quantity: item.quantity,
     size,
     toppings,
+    unitPrice: Number(item.price),
+    salePrice: typeof item.salePrice === 'number' ? Number(item.salePrice) : undefined,
+    isFlashSaleApplied: item.isFlashSaleApplied === true,
     subtotal: Number(item.itemTotal),
   }
 }

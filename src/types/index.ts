@@ -13,6 +13,10 @@ export interface Product {
   images: string[]
   rating: number
   minPrice: number
+  discountedPrice?: number
+  discountPercent?: number
+  flashSale?: boolean
+  flashSaleEndTime?: string
   totalSold?: number
   outOfStock?: boolean
 }
@@ -79,6 +83,10 @@ export interface CartItem {
   size?: ProductSize
   toppings: Topping[]
   note?: string
+  unitPrice?: number
+  salePrice?: number
+  saleQuantity?: number
+  isFlashSaleApplied?: boolean
   subtotal: number
 }
 
@@ -96,6 +104,7 @@ export interface Cart {
 
 export interface CartItemResponse {
   cartItemId: number
+  menuId?: number
   image: string
   menuName: string
   sizeName: string | null
@@ -103,11 +112,21 @@ export interface CartItemResponse {
   quantity: number
   price: number
   itemTotal: number
+  isFlashSaleApplied?: boolean
+  flashSaleApplied?: boolean
+  saleQuantity?: number
+  salePrice?: number
+  flashSaleEligible?: boolean
+  minOrderAmount?: number
+  flashSaleMessage?: string
 }
 
 export interface CartResponse {
   items: CartItemResponse[]
   totalAmount: number
+  flashSaleEligible?: boolean
+  minOrderAmount?: number
+  flashSaleMessage?: string
 }
 
 export interface WardResponse {

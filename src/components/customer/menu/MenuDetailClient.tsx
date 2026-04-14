@@ -62,7 +62,7 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
 
       addItem(product, quantity, selectedSize || undefined, selectedToppingsList)
 
-      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1500 })
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1000 })
 
       // Reset after adding
       setQuantity(1)

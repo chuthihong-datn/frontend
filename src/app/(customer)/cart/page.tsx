@@ -14,8 +14,17 @@ import { formatPrice } from '@/lib/utils'
 import type { CartItem, Product, ProductSize, Topping } from '@/types'
 
 const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const salePriceValue = Number(item.salePrice)
+  const parsedSalePrice = Number.isFinite(salePriceValue) && salePriceValue > 0
+    ? salePriceValue
+    : undefined
+  const saleQuantityValue = Number(item.saleQuantity)
+  const parsedSaleQuantity = Number.isFinite(saleQuantityValue) && saleQuantityValue > 0
+    ? saleQuantityValue
+    : 0
+
   const product: Product = {
-    id: item.cartItemId,
+    id: item.menuId ?? item.cartItemId,
     name: item.menuName,
     images: item.image ? [item.image] : [],
     rating: 0,
@@ -42,6 +51,10 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
     quantity: item.quantity,
     size,
     toppings,
+    unitPrice: Number(item.price),
+    salePrice: parsedSalePrice,
+    saleQuantity: parsedSaleQuantity,
+    isFlashSaleApplied: item.isFlashSaleApplied === true || item.flashSaleApplied === true,
     subtotal: Number(item.itemTotal),
   }
 }
@@ -65,6 +78,12 @@ export default function CartPage() {
     addressDetail: '',
   })
   const [paymentMethod, setPaymentMethod] = useState<'vnpay' | 'momo' | 'cash'>('vnpay')
+  const [rawCartItems, setRawCartItems] = useState<CartItemResponse[]>([])
+  const [flashSaleEligibleState, setFlashSaleEligibleState] = useState<boolean | undefined>(
+    undefined
+  )
+  const [minOrderAmountState, setMinOrderAmountState] = useState<number>(0)
+  const [flashSaleWarningMessageState, setFlashSaleWarningMessageState] = useState('')
   const user = useAuthStore((state) => state.user)
   const accessToken = useAuthStore((state) => state.accessToken)
   const { items, subtotal, shippingFee, discount, total, setCartFromServer, setShippingFee, clearCart } =
@@ -77,6 +96,11 @@ export default function CartPage() {
   const paymentMethodLabel =
     paymentMethod === 'vnpay' ? 'VNPay' : paymentMethod === 'momo' ? 'Ví điện tử' : 'Tiền mặt'
 
+  // Flash sale eligibility check from CartResponse root fields
+  const flashSaleEligible = flashSaleEligibleState ?? true
+  const minOrderAmount = minOrderAmountState
+  const flashSaleWarningMessage = flashSaleWarningMessageState
+
   useEffect(() => {
     setDeliveryInfo((prev) => ({
       fullName: prev.fullName || userFullName,
@@ -87,12 +111,20 @@ export default function CartPage() {
   useEffect(() => {
     const fetchCart = async () => {
       if (!accessToken) {
+        setRawCartItems([])
+        setFlashSaleEligibleState(undefined)
+        setMinOrderAmountState(0)
+        setFlashSaleWarningMessageState('')
         setIsLoadingCart(false)
         return
       }
 
       try {
         const cart = await getCartApi(accessToken)
+        setRawCartItems(cart.items || [])
+        setFlashSaleEligibleState(cart.flashSaleEligible)
+        setMinOrderAmountState(Number(cart.minOrderAmount || 0))
+        setFlashSaleWarningMessageState(cart.flashSaleMessage || '')
         const mappedItems = (cart.items || []).map(mapServerItemToStoreItem)
         setCartFromServer(mappedItems, Number(cart.totalAmount || 0))
       } catch (error: any) {
@@ -214,6 +246,10 @@ export default function CartPage() {
     setIsUpdating(true)
     try {
       const updatedCart = await updateCartItemQuantityApi(itemId, newQuantity, accessToken)
+      setRawCartItems(updatedCart.items || [])
+      setFlashSaleEligibleState(updatedCart.flashSaleEligible)
+      setMinOrderAmountState(Number(updatedCart.minOrderAmount || 0))
+      setFlashSaleWarningMessageState(updatedCart.flashSaleMessage || '')
       const mappedItems = (updatedCart.items || []).map(mapServerItemToStoreItem)
       setCartFromServer(mappedItems, Number(updatedCart.totalAmount || 0))
     } catch (error: any) {
@@ -232,6 +268,10 @@ export default function CartPage() {
     setIsUpdating(true)
     try {
       const updatedCart = await deleteCartItemApi(itemId, accessToken)
+      setRawCartItems(updatedCart.items || [])
+      setFlashSaleEligibleState(updatedCart.flashSaleEligible)
+      setMinOrderAmountState(Number(updatedCart.minOrderAmount || 0))
+      setFlashSaleWarningMessageState(updatedCart.flashSaleMessage || '')
       const mappedItems = (updatedCart.items || []).map(mapServerItemToStoreItem)
       setCartFromServer(mappedItems, Number(updatedCart.totalAmount || 0))
       toast.success('Đã xóa khỏi giỏ hàng', { duration: 1000 })
@@ -288,57 +328,139 @@ export default function CartPage() {
               Món ăn đã chọn
             </h2>
             <div className="space-y-4">
-              {items.map((item) => (
-                <div key={item.id} className="flex gap-4 pb-4 border-b border-border last:border-0 last:pb-0">
-                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-secondary-100 shrink-0">
-                    <img
-                      src={item.product.images?.[0] || '/images/pizza.png'}
-                      alt={item.product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-secondary-900 text-sm">{item.product.name}</p>
-                    {item.size && (
-                      <p className="text-xs text-secondary-500">Size: {item.size.name}</p>
-                    )}
-                    {item.toppings.length > 0 && (
-                      <p className="text-xs text-secondary-500">
-                        Topping: {item.toppings.map((t) => t.name).join(', ')}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                          disabled={isUpdating}
-                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-sm font-semibold w-5 text-center">{item.quantity}</span>
-                        <button
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                          disabled={isUpdating}
-                          className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
+              {items.map((item) => {
+                const unitPrice = item.unitPrice ?? item.product.minPrice
+                const normalizedSaleQuantity =
+                  typeof item.saleQuantity === 'number' && item.saleQuantity > 0
+                    ? item.saleQuantity
+                    : item.isFlashSaleApplied
+                      ? 1
+                      : 0
+                const hasFlashSaleApplied =
+                  flashSaleEligible &&
+                  item.isFlashSaleApplied === true &&
+                  typeof item.salePrice === 'number' &&
+                  item.salePrice > 0 &&
+                  item.quantity > 0
+                const saleQuantity = hasFlashSaleApplied
+                  ? Math.min(normalizedSaleQuantity, item.quantity)
+                  : 0
+                const regularQuantity = Math.max(item.quantity - saleQuantity, 0)
+                const saleSubtotal = hasFlashSaleApplied
+                  ? (item.salePrice ?? 0) * saleQuantity
+                  : 0
+                const regularSubtotal = regularQuantity * unitPrice
+
+                return (
+                  <div key={item.id} className="pb-4 border-b border-border last:border-0 last:pb-0 space-y-3">
+                    {hasFlashSaleApplied && saleQuantity > 0 && (
+                      <div className="flex gap-4 rounded-xl border border-border bg-secondary-50/40 p-3">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-secondary-100 shrink-0">
+                          <img
+                            src={item.product.images?.[0] || '/images/pizza.png'}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-secondary-900 text-sm">{item.product.name}</p>
+                          {item.size && (
+                            <p className="text-xs text-secondary-500">Size: {item.size.name}</p>
+                          )}
+                          {item.toppings.length > 0 && (
+                            <p className="text-xs text-secondary-500">
+                              Topping: {item.toppings.map((t) => t.name).join(', ')}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                disabled
+                                className="w-6 h-6 rounded-full border border-border flex items-center justify-center opacity-50 cursor-not-allowed"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-sm font-semibold w-5 text-center">{saleQuantity}</span>
+                              <button
+                                disabled
+                                className="w-6 h-6 rounded-full border border-border flex items-center justify-center opacity-50 cursor-not-allowed"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-primary text-sm">{formatPrice(saleSubtotal)}</span>
+                              <button
+                                onClick={() => handleRemoveItem(item.id)}
+                                disabled={isUpdating}
+                                className="text-secondary-400 hover:text-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-primary text-sm">{formatPrice(item.subtotal)}</span>
-                        <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          disabled={isUpdating}
-                          className="text-secondary-400 hover:text-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    )}
+
+                    {(!hasFlashSaleApplied || regularQuantity > 0) && (
+                      <div className="flex gap-4 rounded-xl border border-border bg-white p-3">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-secondary-100 shrink-0">
+                          <img
+                            src={item.product.images?.[0] || '/images/pizza.png'}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-secondary-900 text-sm">{item.product.name}</p>
+                          {item.size && (
+                            <p className="text-xs text-secondary-500">Size: {item.size.name}</p>
+                          )}
+                          {item.toppings.length > 0 && (
+                            <p className="text-xs text-secondary-500">
+                              Topping: {item.toppings.map((t) => t.name).join(', ')}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                disabled={isUpdating}
+                                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-sm font-semibold w-5 text-center">
+                                {hasFlashSaleApplied ? regularQuantity : item.quantity}
+                              </span>
+                              <button
+                                onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                disabled={isUpdating}
+                                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-primary text-sm">
+                                {formatPrice(hasFlashSaleApplied ? regularSubtotal : item.subtotal)}
+                              </span>
+                              <button
+                                onClick={() => handleRemoveItem(item.id)}
+                                disabled={isUpdating}
+                                className="text-secondary-400 hover:text-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -491,6 +613,12 @@ export default function CartPage() {
                 <span>Tạm tính ({items.length} món)</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
+              {!flashSaleEligible && minOrderAmount > 0 && flashSaleWarningMessage && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-xs leading-relaxed">
+                  <p className="font-medium mb-1">⚠️ Thông báo giảm giá</p>
+                  <p>{flashSaleWarningMessage}</p>
+                </div>
+              )}
               <div className="flex justify-between text-secondary-600">
                 <span>Phí giao hàng</span>
                 <span>{formatPrice(shippingFee)}</span>

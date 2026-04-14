@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import ProductCard from '@/components/customer/menu/ProductCard'
 import type { Product } from '@/types'
@@ -12,15 +12,52 @@ const VISIBLE_COUNT = 4
 
 interface FeaturedProductsRailProps {
   products: Product[]
+  title?: string
+  flashSaleEndTime?: string | null
 }
 
-export default function FeaturedProductsRail({ products }: FeaturedProductsRailProps) {
+function formatCountdown(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, totalSeconds)
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const seconds = safeSeconds % 60
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, '0'))
+    .join(':')
+}
+
+export default function FeaturedProductsRail({
+  products,
+  title = 'Món ăn nổi bật',
+  flashSaleEndTime = null,
+}: FeaturedProductsRailProps) {
   const hotProducts = products.slice(0, MAX_HOT_ITEMS)
   const [startIndex, setStartIndex] = useState(0)
+  const [countdown, setCountdown] = useState('00 : 00 : 00')
   const maxStartIndex = Math.max(
     0,
     Math.floor((Math.max(hotProducts.length, 1) - 1) / VISIBLE_COUNT) * VISIBLE_COUNT
   )
+
+  useEffect(() => {
+    if (!flashSaleEndTime) {
+      setCountdown('00 : 00 : 00')
+      return
+    }
+
+    const endTime = new Date(flashSaleEndTime)
+
+    const updateCountdown = () => {
+      const remainingSeconds = Math.floor((endTime.getTime() - Date.now()) / 1000)
+      setCountdown(formatCountdown(remainingSeconds))
+    }
+
+    updateCountdown()
+    const intervalId = window.setInterval(updateCountdown, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [flashSaleEndTime])
 
   const canGoPrev = startIndex > 0
   const canShowMore = startIndex < maxStartIndex
@@ -37,8 +74,23 @@ export default function FeaturedProductsRail({ products }: FeaturedProductsRailP
 
   return (
     <section className="container-page py-6">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-2xl font-bold">Món ăn nổi bật</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-2xl font-bold">{title}</h2>
+
+          {flashSaleEndTime && (
+            <div className="inline-flex items-center gap-1">
+              {countdown.split(':').map((segment, index) => (
+                <div key={`${segment}-${index}`} className="inline-flex items-center gap-1">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md border border-orange-300 bg-primary px-1 font-mono text-xs font-bold text-white shadow-sm">
+                    {segment}
+                  </span>
+                  {index < 2 && <span className="text-lg font-bold text-primary">:</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           {canGoPrev && (
