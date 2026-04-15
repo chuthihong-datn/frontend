@@ -4,12 +4,67 @@ import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
-import { addToCartApi } from '@/api/cart'
+import { addToCartApi, getCartApi } from '@/api/cart'
 import { ShoppingCart, Plus, Minus } from 'lucide-react'
-import type { ProductDetail, ProductSize } from '@/types'
+import { formatPrice } from '@/lib/utils'
+import type { CartItem, CartItemResponse, ProductDetail, ProductSize, Topping } from '@/types'
 
 interface MenuDetailClientProps {
   product: ProductDetail
+}
+
+const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const quantity = Number(item.quantity) || 1
+  const itemTotal = Number(item.itemTotal) || 0
+  const hasFlashSale = item.isFlashSaleApplied === true || item.flashSaleApplied === true
+  const saleQuantity = Number(item.saleQuantity) || (hasFlashSale ? 1 : 0)
+  const salePriceValue = Number(item.salePrice) || 0
+  
+  // Recalculate unitPrice for regular items when flash sale is applied
+  // to ensure size/topping prices are included
+  let unitPrice = Number(item.price)
+  if (hasFlashSale && saleQuantity > 0 && saleQuantity < quantity) {
+    const regularQuantity = quantity - saleQuantity
+    const saleSubtotal = salePriceValue * saleQuantity
+    const regularSubtotal = itemTotal - saleSubtotal
+    if (regularQuantity > 0) {
+      unitPrice = regularSubtotal / regularQuantity
+    }
+  }
+
+  const product = {
+    id: item.menuId ?? item.cartItemId,
+    name: item.menuName,
+    images: item.image ? [item.image] : [],
+    rating: 0,
+    minPrice: unitPrice,
+  }
+
+  const size: ProductSize | undefined = item.sizeName
+    ? {
+        id: 0,
+        name: item.sizeName,
+        extraPrice: 0,
+      }
+    : undefined
+
+  const toppings: Topping[] = (item.toppings || []).map((name, index) => ({
+    id: index + 1,
+    name,
+    price: 0,
+  }))
+
+  return {
+    id: String(item.cartItemId),
+    product,
+    quantity,
+    size,
+    toppings,
+    unitPrice,
+    salePrice: typeof item.salePrice === 'number' ? Number(item.salePrice) : undefined,
+    isFlashSaleApplied: hasFlashSale,
+    subtotal: itemTotal,
+  }
 }
 
 export default function MenuDetailClient({ product }: MenuDetailClientProps) {
@@ -20,11 +75,16 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
   const [quantity, setQuantity] = useState(1)
   const [isAdding, setIsAdding] = useState(false)
 
-  const { addItem } = useCartStore()
+  const { setCartFromServer } = useCartStore()
   const accessToken = useAuthStore((state) => state.accessToken)
+  const hasFlashSale =
+    product.flashSale === true &&
+    typeof product.discountedPrice === 'number' &&
+    product.discountedPrice > 0 &&
+    product.discountedPrice < product.minPrice
 
-  // Calculate total price
-  const totalPrice = useMemo(() => {
+  // Calculate base item price (without size/toppings)
+  const basePrice = useMemo(() => {
     let price = product.minPrice
     if (selectedSize) {
       price += selectedSize.extraPrice
@@ -35,8 +95,30 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
         price += topping.price
       }
     })
-    return price * quantity
-  }, [product.minPrice, product.toppings, selectedSize, selectedToppings, quantity])
+    return price
+  }, [product.minPrice, product.toppings, selectedSize, selectedToppings])
+
+  // Calculate total price with flash sale logic
+  const totalPrice = useMemo(() => {
+    if (!hasFlashSale) {
+      return basePrice * quantity
+    }
+
+    // Flash sale: only limited items at sale price, rest at regular price
+    const saleQtyLimit = product.saleQuantity ?? 1
+    const saleQuantity = Math.min(saleQtyLimit, quantity)
+    const regularQuantity = Math.max(quantity - saleQuantity, 0)
+
+    const salePricePerItem = product.discountedPrice! + (selectedSize?.extraPrice ?? 0) + 
+      selectedToppings.reduce((sum, toppingId) => {
+        const topping = product.toppings?.find((t) => t.id === toppingId)
+        return sum + (topping?.price ?? 0)
+      }, 0)
+
+    const regularPricePerItem = basePrice
+
+    return (salePricePerItem * saleQuantity) + (regularPricePerItem * regularQuantity)
+  }, [hasFlashSale, basePrice, quantity, product.discountedPrice, product.minPrice, product.saleQuantity, selectedSize, product.toppings, selectedToppings])
 
   const handleAddToCart = async () => {
     if (!accessToken) {
@@ -46,10 +128,6 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
 
     setIsAdding(true)
     try {
-      const selectedToppingsList = product.toppings?.filter((t) =>
-        selectedToppings.includes(t.id)
-      ) || []
-
       await addToCartApi(
         {
           menuId: product.id,
@@ -60,7 +138,9 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
         accessToken
       )
 
-      addItem(product, quantity, selectedSize || undefined, selectedToppingsList)
+      const cart = await getCartApi(accessToken)
+      const mappedItems = (cart.items || []).map(mapServerItemToStoreItem)
+      setCartFromServer(mappedItems, Number(cart.totalAmount || 0))
 
       toast.success(`Đã thêm ${product.name} vào giỏ hàng!`, { duration: 1000 })
 
@@ -95,9 +175,18 @@ export default function MenuDetailClient({ product }: MenuDetailClientProps) {
       >
         {product.name}
       </h1>
-      <p className="text-3xl font-bold text-primary mb-6">
-        {Math.ceil(product.minPrice).toLocaleString('vi-VN')}đ
-      </p>
+      {hasFlashSale ? (
+        <div className="mb-6">
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-bold text-primary">{formatPrice(product.discountedPrice)}</p>
+          </div>
+          <p className="text-lg text-secondary-500 line-through">
+            {formatPrice(product.minPrice)}
+          </p>
+        </div>
+      ) : (
+        <p className="text-3xl font-bold text-primary mb-6">{formatPrice(product.minPrice)}</p>
+      )}
 
       {/* Description */}
       <div className="mb-8">

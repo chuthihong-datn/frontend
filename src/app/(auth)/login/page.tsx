@@ -13,12 +13,30 @@ import { getProfile } from '@/api/user'
 import { UserRole, type CartItem, type Product, type ProductSize, type Topping, type CartItemResponse } from '@/types'
 
 const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
+  const quantity = Number(item.quantity) || 1
+  const itemTotal = Number(item.itemTotal) || 0
+  const hasFlashSale = item.isFlashSaleApplied === true || item.flashSaleApplied === true
+  const saleQuantity = Number(item.saleQuantity) || (hasFlashSale ? 1 : 0)
+  const salePriceValue = Number(item.salePrice) || 0
+  
+  // Recalculate unitPrice for regular items when flash sale is applied
+  // to ensure size/topping prices are included
+  let unitPrice = Number(item.price)
+  if (hasFlashSale && saleQuantity > 0 && saleQuantity < quantity) {
+    const regularQuantity = quantity - saleQuantity
+    const saleSubtotal = salePriceValue * saleQuantity
+    const regularSubtotal = itemTotal - saleSubtotal
+    if (regularQuantity > 0) {
+      unitPrice = regularSubtotal / regularQuantity
+    }
+  }
+
   const product: Product = {
     id: item.menuId ?? item.cartItemId,
     name: item.menuName,
     images: item.image ? [item.image] : [],
     rating: 0,
-    minPrice: Number(item.price),
+    minPrice: unitPrice,
   }
 
   const size: ProductSize | undefined = item.sizeName
@@ -38,13 +56,13 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
   return {
     id: String(item.cartItemId),
     product,
-    quantity: item.quantity,
+    quantity,
     size,
     toppings,
-    unitPrice: Number(item.price),
+    unitPrice,
     salePrice: typeof item.salePrice === 'number' ? Number(item.salePrice) : undefined,
-    isFlashSaleApplied: item.isFlashSaleApplied === true,
-    subtotal: Number(item.itemTotal),
+    isFlashSaleApplied: hasFlashSale,
+    subtotal: itemTotal,
   }
 }
 

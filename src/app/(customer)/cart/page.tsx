@@ -14,21 +14,30 @@ import { formatPrice } from '@/lib/utils'
 import type { CartItem, Product, ProductSize, Topping } from '@/types'
 
 const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
-  const salePriceValue = Number(item.salePrice)
-  const parsedSalePrice = Number.isFinite(salePriceValue) && salePriceValue > 0
-    ? salePriceValue
-    : undefined
-  const saleQuantityValue = Number(item.saleQuantity)
-  const parsedSaleQuantity = Number.isFinite(saleQuantityValue) && saleQuantityValue > 0
-    ? saleQuantityValue
-    : 0
+  const quantity = Number(item.quantity) || 1
+  const itemTotal = Number(item.itemTotal) || 0
+  const hasFlashSale = item.isFlashSaleApplied === true || item.flashSaleApplied === true
+  const saleQuantity = Number(item.saleQuantity) || (hasFlashSale ? 1 : 0)
+  const salePriceValue = Number(item.salePrice) || 0
+  
+  // Recalculate unitPrice for regular items when flash sale is applied
+  // to ensure size/topping prices are included
+  let unitPrice = Number(item.price)
+  if (hasFlashSale && saleQuantity > 0 && saleQuantity < quantity) {
+    const regularQuantity = quantity - saleQuantity
+    const saleSubtotal = salePriceValue * saleQuantity
+    const regularSubtotal = itemTotal - saleSubtotal
+    if (regularQuantity > 0) {
+      unitPrice = regularSubtotal / regularQuantity
+    }
+  }
 
   const product: Product = {
     id: item.menuId ?? item.cartItemId,
     name: item.menuName,
     images: item.image ? [item.image] : [],
     rating: 0,
-    minPrice: Number(item.price),
+    minPrice: unitPrice,
   }
 
   const size: ProductSize | undefined = item.sizeName
@@ -48,14 +57,14 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
   return {
     id: String(item.cartItemId),
     product,
-    quantity: item.quantity,
+    quantity,
     size,
     toppings,
-    unitPrice: Number(item.price),
-    salePrice: parsedSalePrice,
-    saleQuantity: parsedSaleQuantity,
-    isFlashSaleApplied: item.isFlashSaleApplied === true || item.flashSaleApplied === true,
-    subtotal: Number(item.itemTotal),
+    unitPrice,
+    salePrice: Number.isFinite(salePriceValue) && salePriceValue > 0 ? salePriceValue : undefined,
+    saleQuantity: Number.isFinite(saleQuantity) && saleQuantity > 0 ? saleQuantity : 0,
+    isFlashSaleApplied: hasFlashSale,
+    subtotal: itemTotal,
   }
 }
 
@@ -100,6 +109,27 @@ export default function CartPage() {
   const flashSaleEligible = flashSaleEligibleState ?? true
   const minOrderAmount = minOrderAmountState
   const flashSaleWarningMessage = flashSaleWarningMessageState
+  const hasFlashSaleItems = rawCartItems.some(
+    (item) =>
+      item.isFlashSaleApplied === true ||
+      item.flashSaleApplied === true ||
+      (typeof item.salePrice === 'number' && item.salePrice > 0)
+  )
+  const isBelowMinOrderForFlashSale =
+    hasFlashSaleItems && minOrderAmount > 0 && subtotal < minOrderAmount
+  const missingAmount = Math.max(minOrderAmount - subtotal, 0)
+  const missingAmountInK = Math.ceil(missingAmount / 1000)
+  const minimumOrderWarning =
+    isBelowMinOrderForFlashSale || (!flashSaleEligible && minOrderAmount > 0)
+      ? `Mua thêm ${missingAmountInK}k để mở khóa ưu đãi Flash Sale🔥.`
+      : ''
+  const subtotalWithoutFlashSale = items.reduce((sum, item) => {
+    const unitPrice = item.unitPrice ?? item.product.minPrice
+    return sum + unitPrice * item.quantity
+  }, 0)
+  const totalWithoutFlashSale = subtotalWithoutFlashSale + shippingFee - discount
+  const flashSaleSavings = Math.max(totalWithoutFlashSale - total, 0)
+  const hasVisibleFlashSaleSavings = flashSaleSavings > 0
 
   useEffect(() => {
     setDeliveryInfo((prev) => ({
@@ -337,7 +367,6 @@ export default function CartPage() {
                       ? 1
                       : 0
                 const hasFlashSaleApplied =
-                  flashSaleEligible &&
                   item.isFlashSaleApplied === true &&
                   typeof item.salePrice === 'number' &&
                   item.salePrice > 0 &&
@@ -613,10 +642,10 @@ export default function CartPage() {
                 <span>Tạm tính ({items.length} món)</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
-              {!flashSaleEligible && minOrderAmount > 0 && flashSaleWarningMessage && (
+              {minimumOrderWarning && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-xs leading-relaxed">
                   <p className="font-medium mb-1">⚠️ Thông báo giảm giá</p>
-                  <p>{flashSaleWarningMessage}</p>
+                  <p>{minimumOrderWarning}</p>
                 </div>
               )}
               <div className="flex justify-between text-secondary-600">
@@ -631,7 +660,14 @@ export default function CartPage() {
               )}
               <div className="pt-3 border-t border-border flex justify-between font-bold text-base">
                 <span>Tổng thanh toán</span>
-                <span className="text-primary text-lg">{formatPrice(total)}</span>
+                <div className="text-right">
+                  <span className="text-primary text-lg block">{formatPrice(total)}</span>
+                  {hasVisibleFlashSaleSavings && (
+                    <span className="text-secondary-500 text-xs line-through">
+                      {formatPrice(totalWithoutFlashSale)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

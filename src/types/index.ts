@@ -27,6 +27,11 @@ export interface ProductDetail {
   description: string
   images: string[]
   minPrice: number
+  discountedPrice?: number
+  discountPercent?: number
+  flashSale?: boolean
+  flashSaleEndTime?: string
+  saleQuantity?: number
   amount: number
   sizes: ProductSize[]
   toppings: Topping[]
