@@ -4,16 +4,16 @@ import { Bell, Search } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 const routeTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/categories': 'Quản lý danh mục',
-  '/menus': 'Quản lý món ăn',
-  '/topping': 'Quản lý topping',
-  '/delivery-addresses': 'Quản lý địa chỉ giao hàng',
-  '/orders': 'Quản lý đơn hàng',
-  '/products': 'Quản lý món ăn',
-  '/vouchers': 'Quản lý khuyến mãi & Voucher',
-  '/reviews': 'Quản lý đánh giá',
-  '/accounts': 'Quản lý tài khoản',
+  '/dashboard': '',
+  '/categories': '',
+  '/menus': '',
+  '/topping': '',
+  '/delivery-addresses': '',
+  '/orders': '',
+  '/products': '',
+  '/promotions': '',
+  '/reviews': '',
+  '/accounts': '',
 }
 
 export default function AdminHeader() {
@@ -27,12 +27,6 @@ export default function AdminHeader() {
       <h1 className="text-lg font-display font-semibold text-secondary-900">{title}</h1>
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
-          <input
-            placeholder="Tìm kiếm..."
-            className="pl-9 pr-4 py-2 text-sm bg-secondary-50 rounded-xl border border-transparent 
-              focus:outline-none focus:border-primary/30 w-48"
-          />
         </div>
         <button className="relative p-2 hover:bg-secondary-50 rounded-xl">
           <Bell className="w-5 h-5 text-secondary-600" />

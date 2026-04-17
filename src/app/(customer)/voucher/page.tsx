@@ -1,149 +1,228 @@
 'use client'
 
-import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
+import { Clock, Tag } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { User, ClipboardList, Tag, LogOut } from 'lucide-react'
+import { toast } from 'sonner'
+import { getAvailableVouchersApi, saveVoucherApi } from '@/api/user'
 import { useAuthStore } from '@/store/authStore'
-import Pagination from '@/components/shared/Pagination'
+import type { AvailableVoucherResponse } from '@/types'
+import { formatPrice } from '@/lib/utils'
 
-const SIDEBAR_ITEMS = [
-  { id: 'profile', label: 'Thông tin cá nhân', icon: User, href: '/profile' },
-  { id: 'orders', label: 'Lịch sử đặt hàng', icon: ClipboardList, href: '/profile/orders' },
-  { id: 'vouchers', label: 'Voucher của tôi', icon: Tag, href: '/voucher' },
-]
+function formatDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '--'
+  }
 
-const MOCK_VOUCHERS = [
-  {
-    id: 'VOUCHER-001',
-    code: 'GIAM50K',
-    description: 'Giảm 50.000đ cho đơn từ 500.000đ',
-    expiresAt: '20/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-002',
-    code: 'FREESHIP15K',
-    description: 'Freeship tối đa 15.000đ cho đơn từ 50.000đ',
-    expiresAt: '22/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-003',
-    code: 'NEWUSER30',
-    description: 'Giảm 30% cho đơn đầu tiên (tối đa 40.000đ)',
-    expiresAt: '25/03/2026',
-    status: 'used',
-  },
-  {
-    id: 'VOUCHER-004',
-    code: 'COMBO20',
-    description: 'Giảm 20.000đ khi mua combo bất kỳ',
-    expiresAt: '15/03/2026',
-    status: 'expired',
-  },
-  {
-    id: 'VOUCHER-005',
-    code: 'LUNCH25',
-    description: 'Giảm 25.000đ khung giờ trưa 10:30 - 13:30',
-    expiresAt: '28/03/2026',
-    status: 'available',
-  },
-  {
-    id: 'VOUCHER-006',
-    code: 'WEEKEND35',
-    description: 'Giảm 35.000đ cho đơn cuối tuần',
-    expiresAt: '30/03/2026',
-    status: 'available',
-  },
-]
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
 
-const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  available: { label: 'Khả dụng', class: 'status-delivered' },
-  used: { label: 'Đã dùng', class: 'status-shipping' },
-  expired: { label: 'Hết hạn', class: 'status-cancelled' },
+function buildVoucherSummary(voucher: AvailableVoucherResponse): string {
+  const discountType = String(voucher.discountType || '').trim().toUpperCase()
+  const discountValue = Number(voucher.discountValue || 0)
+  const minOrder = Number(voucher.minOrderAmount || 0)
+  const maxDiscount = Number(voucher.maxDiscount || 0)
+
+  const chunks: string[] = []
+
+  if (discountType.includes('PERCENT')) {
+    chunks.push(`Giảm ${discountValue}%`)
+  } else {
+    chunks.push(`Giảm ${formatPrice(discountValue)}`)
+  }
+
+  if (minOrder > 0) {
+    chunks.push(`đơn từ ${formatPrice(minOrder)}`)
+  }
+
+  if (maxDiscount > 0) {
+    chunks.push(`giảm tối đa ${formatPrice(maxDiscount)}`)
+  }
+
+  return chunks.join(' • ')
+}
+
+function getExpiresLabel(endDate: string): string {
+  const end = new Date(endDate).getTime()
+  if (!Number.isFinite(end)) {
+    return 'Không xác định hạn'
+  }
+
+  const now = Date.now()
+  const diffMs = Math.max(0, end - now)
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (days > 0) {
+    return `Hết hạn trong ${days} ngày`
+  }
+
+  const hours = Math.floor(diffMs / (1000 * 60 * 60))
+  if (hours > 0) {
+    return `Hết hạn trong ${hours} giờ`
+  }
+
+  return 'Sắp hết hạn'
 }
 
 export default function VoucherPage() {
-  const { logout } = useAuthStore()
   const router = useRouter()
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const [vouchers, setVouchers] = useState<AvailableVoucherResponse[]>([])
+  const [savedVoucherIds, setSavedVoucherIds] = useState<Array<string | number>>([])
+  const [savingVoucherId, setSavingVoucherId] = useState<string | number | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    router.push('/')
+  useEffect(() => {
+    const fetchVouchers = async () => {
+      setIsLoading(true)
+
+      try {
+        const data = await getAvailableVouchersApi()
+        setVouchers(data)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || error?.message || 'Không thể tải kho voucher')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVouchers()
+  }, [])
+
+  const sortedVouchers = useMemo(() => {
+    return [...vouchers].sort((a, b) => {
+      if (a.outOfStock === b.outOfStock) {
+        return new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+      }
+      return a.outOfStock ? 1 : -1
+    })
+  }, [vouchers])
+
+  const handleSaveVoucher = async (voucher: AvailableVoucherResponse) => {
+    if (voucher.outOfStock || savedVoucherIds.includes(voucher.voucherId)) {
+      return
+    }
+
+    if (!accessToken) {
+      toast.error('Vui lòng đăng nhập để lưu voucher')
+      router.push('/login')
+      return
+    }
+
+    setSavingVoucherId(voucher.voucherId)
+
+    try {
+      const response = await saveVoucherApi(voucher.voucherId, accessToken)
+
+      if (response.outOfStock) {
+        toast.error('Voucher đã hết lượt lưu')
+        setVouchers((current) =>
+          current.map((item) =>
+            String(item.voucherId) === String(voucher.voucherId)
+              ? { ...item, outOfStock: true }
+              : item
+          )
+        )
+        return
+      }
+
+      setSavedVoucherIds((current) => [...current, response.voucherId])
+      toast.success(`Đã lưu mã ${response.code}`)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Không thể lưu voucher')
+    } finally {
+      setSavingVoucherId(null)
+    }
   }
 
   return (
     <div className="container-page py-8">
-      <div className="grid lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-1">
-          <div className="card p-5">
-            <nav className="space-y-1">
-              {SIDEBAR_ITEMS.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                      item.id === 'vouchers'
-                        ? 'bg-primary-50 text-primary font-medium'
-                        : 'text-secondary-700 hover:bg-secondary-100'
+      <nav className="text-sm text-secondary-500 mb-4">
+        <span>Trang chủ</span>
+        <span className="mx-2">›</span>
+        <span className="text-secondary-900 font-medium">Kho Voucher & Ưu Đãi</span>
+      </nav>
+
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-secondary-900 mb-1">
+          Kho Voucher Hệ Thống
+        </h1>
+        <span className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-100 px-3 py-1.5 rounded-full">
+          🎫 Đang có <strong>{sortedVouchers.length} mã</strong>
+        </span>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {isLoading ? (
+          <div className="col-span-full text-center py-10 text-secondary-500">
+            Đang tải voucher...
+          </div>
+        ) : sortedVouchers.length === 0 ? (
+          <div className="col-span-full text-center py-10 text-secondary-500">
+            Hiện chưa có voucher khả dụng
+          </div>
+        ) : (
+          sortedVouchers.map((voucher) => {
+            const isSaved = savedVoucherIds.includes(voucher.voucherId)
+            const isDisabled = voucher.outOfStock || isSaved || savingVoucherId === voucher.voucherId
+
+            return (
+              <div
+                key={String(voucher.voucherId)}
+                className={`rounded-2xl border p-5 relative overflow-hidden ${
+                  voucher.outOfStock ? 'bg-secondary-100 border-secondary-300 opacity-80' : 'bg-orange-50 border-primary/20'
+                }`}
+              >
+                <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-background" />
+                <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-background" />
+
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                    <Tag className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-secondary-900 text-sm">{voucher.title}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Clock className="w-3 h-3 text-error" />
+                      <span className="text-xs text-error font-medium">{getExpiresLabel(voucher.endDate)}</span>
+                    </div>
+                    <p className="text-xs text-secondary-500 mt-1">Hạn đến: {formatDate(voucher.endDate)}</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-secondary-600 mb-3">{buildVoucherSummary(voucher)}</p>
+
+                <div className="border-t border-dashed border-secondary-200 pt-3 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs text-secondary-500">CODE: </span>
+                    <span className="font-mono font-bold text-secondary-800">{voucher.code}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveVoucher(voucher)}
+                    disabled={isDisabled}
+                    className={`btn-sm text-xs px-3 py-1.5 rounded-lg font-medium ${
+                      isDisabled ? 'bg-secondary-300 text-secondary-600 cursor-not-allowed' : 'btn-primary'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                )
-              })}
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-error hover:bg-red-50 transition-colors mt-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Đăng xuất
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        <div className="lg:col-span-3">
-          <div className="card p-6">
-            <h2 className="font-semibold text-secondary-900 mb-5">Voucher của tôi</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    {['Mã voucher', 'Mô tả', 'Hạn sử dụng', 'Trạng thái', 'Thao tác'].map((h) => (
-                      <th key={h} className="text-left py-3 px-2 text-secondary-500 font-medium whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MOCK_VOUCHERS.map((voucher) => (
-                    <tr key={voucher.id} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
-                      <td className="py-3 px-2 font-mono font-semibold text-secondary-900">{voucher.code}</td>
-                      <td className="py-3 px-2 text-secondary-600 min-w-[280px]">{voucher.description}</td>
-                      <td className="py-3 px-2 text-secondary-600">{voucher.expiresAt}</td>
-                      <td className="py-3 px-2">
-                        <span className={STATUS_MAP[voucher.status]?.class ?? 'badge'}>
-                          {STATUS_MAP[voucher.status]?.label}
-                        </span>
-                      </td>
-                      <td className="py-3 px-2">
-                        <button className="text-primary hover:underline text-xs font-medium">Chi tiết</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-6">
-              <Pagination page={1} totalPages={3} />
-            </div>
-          </div>
-        </div>
+                    {savingVoucherId === voucher.voucherId
+                      ? 'Đang lưu...'
+                      : isSaved
+                        ? 'Đã lưu'
+                        : voucher.outOfStock
+                          ? 'Hết lượt'
+                          : 'Lưu mã'}
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
     </div>
   )

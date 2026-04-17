@@ -291,6 +291,25 @@ export interface Voucher {
   isActive: boolean
 }
 
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | string
+
+export interface UserVoucherResponse {
+  voucherId: number | string
+  code: string
+  title: string
+  description: string
+  discountType: DiscountType
+  discountValue: number
+  maxDiscount?: number
+  minOrderAmount: number
+  startDate: string
+  endDate: string
+}
+
+export interface AvailableVoucherResponse extends UserVoucherResponse {
+  outOfStock: boolean
+}
+
 // ============================================================
 // USER / AUTH
 // ============================================================
@@ -517,4 +536,81 @@ export type AdminMenuResponse = {
   categoryName: string
   toppings: string[]
   sizes: AdminMenuSizeResponse[]
+}
+
+// ============================================================
+// ADMIN / PROMOTIONS
+// ============================================================
+
+export type AdminPromotionDiscountType = 'PERCENT' | 'FIXED' | string
+
+export type AdminVoucherRequest = {
+  code: string
+  title: string
+  description: string
+  discountType: AdminPromotionDiscountType
+  discountValue: number
+  maxDiscount?: number | null
+  minOrderAmount?: number | null
+  startDate: string
+  endDate: string
+  usageLimit?: number | null
+  isActive: boolean
+}
+
+export type AdminVoucherResponse = {
+  voucherId: string | number
+  code: string
+  title: string
+  description: string
+  discountType: AdminPromotionDiscountType
+  discountValue: number
+  maxDiscount?: number | null
+  minOrderAmount?: number | null
+  startDate: string
+  endDate: string
+  usageLimit?: number | null
+  isActive: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export type AdminFlashSaleRequest = {
+  title: string
+  description: string
+  discountType: AdminPromotionDiscountType
+  discountValue: number
+  maxDiscount?: number | null
+  minOrderAmount?: number | null
+  maxQuantityPerOrder?: number | null
+  minStock?: number | null
+  startTime: string
+  endTime: string
+  isActive: boolean
+  menuIds: Array<string | number>
+}
+
+export type AdminFlashSaleItemRef = {
+  menuId?: string | number
+  id?: string | number
+  name?: string
+  menuName?: string
+}
+
+export type AdminFlashSaleResponse = {
+  flashSaleId: string | number
+  title: string
+  description: string
+  discountType: AdminPromotionDiscountType
+  discountValue: number
+  maxDiscount?: number | null
+  minOrderAmount?: number | null
+  maxQuantityPerOrder?: number | null
+  minStock?: number | null
+  startTime: string
+  endTime: string
+  isActive: boolean
+  menuNames: string[]
+  createdAt?: string | null
+  updatedAt?: string | null
 }

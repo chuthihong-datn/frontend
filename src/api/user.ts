@@ -1,5 +1,26 @@
 import apiClient from '@/lib/api'
-import type { ProfileResponse, ProfileUpdateRequest, OrderByUserResponse } from '@/types'
+import type {
+  AvailableVoucherResponse,
+  OrderByUserResponse,
+  ProfileResponse,
+  ProfileUpdateRequest,
+  UserVoucherResponse,
+} from '@/types'
+
+interface ApiErrorResponse {
+  success?: boolean
+  message?: string
+}
+
+type AvailableVoucherListPayload =
+  | AvailableVoucherResponse[]
+  | { data: AvailableVoucherResponse[] }
+  | ApiErrorResponse
+
+type SaveVoucherPayload =
+  | AvailableVoucherResponse
+  | { data: AvailableVoucherResponse }
+  | ApiErrorResponse
 
 
 export const getProfile = async (): Promise<ProfileResponse> => {
@@ -45,4 +66,53 @@ export const getMyOrders = async (): Promise<OrderByUserResponse[]> => {
 export const getMyOrderDetail = async (orderId: number | string): Promise<OrderByUserResponse> => {
   const response = await apiClient.get<OrderByUserResponse>(`/user/order/${orderId}`)
   return response.data
+}
+
+export const getMyVouchersApi = async (): Promise<UserVoucherResponse[]> => {
+  const response = await apiClient.get<UserVoucherResponse[] | { data: UserVoucherResponse[] }>('/user/vouchers')
+
+  if (Array.isArray(response.data)) {
+    return response.data
+  }
+
+  return response.data?.data ?? []
+}
+
+export const getAvailableVouchersApi = async (): Promise<AvailableVoucherResponse[]> => {
+  const response = await apiClient.get<AvailableVoucherListPayload>('/voucher')
+
+  if (response.data && typeof response.data === 'object' && 'success' in response.data && response.data.success === false) {
+    throw new Error(response.data.message || 'Khong the tai danh sach voucher')
+  }
+
+  if (Array.isArray(response.data)) {
+    return response.data
+  }
+
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data ?? []
+  }
+
+  return []
+}
+
+export const saveVoucherApi = async (
+  voucherId: number | string,
+  accessToken: string
+): Promise<AvailableVoucherResponse> => {
+  const response = await apiClient.post<SaveVoucherPayload>(`/voucher/${voucherId}/save`, null, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (response.data && typeof response.data === 'object' && 'success' in response.data && response.data.success === false) {
+    throw new Error(response.data.message || 'Khong the luu voucher')
+  }
+
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data
+  }
+
+  return response.data as AvailableVoucherResponse
 }

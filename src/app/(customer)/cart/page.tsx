@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Minus, Plus, Trash2, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Minus, Plus, Trash2, ChevronRight, Search } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { getCartApi, updateCartItemQuantityApi, deleteCartItemApi } from '@/api/cart'
 import { createOrderApi } from '@/api/order'
 import { getAllWardDeliveryApi } from '@/api/ward'
-import type { CartItemResponse, WardResponse } from '@/types'
+import { getMyVouchersApi } from '@/api/user'
+import type { CartItemResponse, UserVoucherResponse, WardResponse } from '@/types'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
@@ -80,6 +81,7 @@ export default function CartPage() {
   const [addressDetail, setAddressDetail] = useState('')
   const [note, setNote] = useState('')
   const [voucherCode, setVoucherCode] = useState('')
+  const [voucherInputCode, setVoucherInputCode] = useState('')
   const [fieldErrors, setFieldErrors] = useState({
     fullName: '',
     phone: '',
@@ -88,6 +90,10 @@ export default function CartPage() {
   })
   const [paymentMethod, setPaymentMethod] = useState<'vnpay' | 'momo' | 'cash'>('vnpay')
   const [rawCartItems, setRawCartItems] = useState<CartItemResponse[]>([])
+  const [vouchers, setVouchers] = useState<UserVoucherResponse[]>([])
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(false)
+  const [selectedVoucherId, setSelectedVoucherId] = useState<string>('')
+  const [isVoucherPanelOpen, setIsVoucherPanelOpen] = useState(false)
   const [flashSaleEligibleState, setFlashSaleEligibleState] = useState<boolean | undefined>(
     undefined
   )
@@ -104,6 +110,90 @@ export default function CartPage() {
   const selectedWard = wards.find((ward) => String(ward.wardId) === selectedWardId)
   const paymentMethodLabel =
     paymentMethod === 'vnpay' ? 'VNPay' : paymentMethod === 'momo' ? 'Ví điện tử' : 'Tiền mặt'
+
+  const now = Date.now()
+  const selectedVoucher = useMemo(
+    () => vouchers.find((voucher) => String(voucher.voucherId) === selectedVoucherId),
+    [vouchers, selectedVoucherId]
+  )
+  const normalizedVoucherInput = voucherInputCode.trim().toUpperCase()
+
+  const getVoucherDisabledReason = (voucher: UserVoucherResponse): string | null => {
+    const startTime = new Date(voucher.startDate).getTime()
+    const endTime = new Date(voucher.endDate).getTime()
+    const minVoucherOrder = Number(voucher.minOrderAmount || 0)
+
+    if (Number.isFinite(startTime) && startTime > now) {
+      return 'Voucher chưa tới thời gian áp dụng'
+    }
+
+    if (Number.isFinite(endTime) && endTime < now) {
+      return 'Voucher đã hết hạn'
+    }
+
+    if (minVoucherOrder > 0 && subtotal < minVoucherOrder) {
+      return `Cần tối thiểu ${formatPrice(minVoucherOrder)}`
+    }
+
+    return null
+  }
+
+  const getVoucherBenefitText = (voucher: UserVoucherResponse): string => {
+    const discountType = String(voucher.discountType || '').trim().toUpperCase()
+    const discountValue = Number(voucher.discountValue || 0)
+    const minOrder = Number(voucher.minOrderAmount || 0)
+    const maxDiscount = Number(voucher.maxDiscount || 0)
+
+    let benefitText = ''
+    if (['PERCENT', 'PERCENTAGE', 'PERCENTAGE_DISCOUNT'].includes(discountType)) {
+      benefitText = `Giảm ${discountValue}% cho đơn từ ${formatPrice(minOrder)}.`
+      if (maxDiscount > 0) {
+        benefitText += `\nGiảm tối đa ${formatPrice(maxDiscount)}.`
+      }
+      return benefitText
+    }
+
+    benefitText = `Giảm ${formatPrice(discountValue)} cho đơn từ ${formatPrice(minOrder)}.`
+    if (maxDiscount > 0) {
+      benefitText += `\nGiảm tối đa ${formatPrice(maxDiscount)}.`
+    }
+    return benefitText
+  }
+
+  const appliedVoucherDiscount = useMemo(() => {
+    if (!selectedVoucher) {
+      return 0
+    }
+
+    if (getVoucherDisabledReason(selectedVoucher)) {
+      return 0
+    }
+
+    const discountValue = Number(selectedVoucher.discountValue || 0)
+    const maxDiscount = Number(selectedVoucher.maxDiscount || 0)
+    const discountType = String(selectedVoucher.discountType || '').trim().toUpperCase()
+    const isPercentDiscount = ['PERCENT', 'PERCENTAGE', 'PERCENTAGE_DISCOUNT'].includes(discountType)
+    const isFixedDiscount = ['FIXED', 'FIXED_AMOUNT', 'AMOUNT'].includes(discountType)
+    const isFreeShippingDiscount = ['FREE_SHIPPING', 'SHIPPING'].includes(discountType)
+
+    let calculatedDiscount = 0
+    if (isPercentDiscount) {
+      calculatedDiscount = subtotal * (discountValue / 100)
+      if (maxDiscount > 0) {
+        calculatedDiscount = Math.min(calculatedDiscount, maxDiscount)
+      }
+      calculatedDiscount = Math.min(calculatedDiscount, subtotal)
+    } else if (isFreeShippingDiscount) {
+      calculatedDiscount = shippingFee
+    } else if (isFixedDiscount || discountType.length > 0) {
+      calculatedDiscount = Math.min(discountValue, subtotal)
+    }
+
+    return Math.max(0, Math.round(calculatedDiscount))
+  }, [selectedVoucher, subtotal, shippingFee, now])
+
+  const effectiveDiscount = appliedVoucherDiscount > 0 ? appliedVoucherDiscount : discount
+  const payableTotal = Math.max(subtotal + shippingFee - effectiveDiscount, 0)
 
   // Flash sale eligibility check from CartResponse root fields
   const flashSaleEligible = flashSaleEligibleState ?? true
@@ -127,9 +217,33 @@ export default function CartPage() {
     const unitPrice = item.unitPrice ?? item.product.minPrice
     return sum + unitPrice * item.quantity
   }, 0)
-  const totalWithoutFlashSale = subtotalWithoutFlashSale + shippingFee - discount
-  const flashSaleSavings = Math.max(totalWithoutFlashSale - total, 0)
+  const totalWithoutFlashSale = Math.max(subtotalWithoutFlashSale + shippingFee - effectiveDiscount, 0)
+  const flashSaleSavings = Math.max(totalWithoutFlashSale - payableTotal, 0)
   const hasVisibleFlashSaleSavings = flashSaleSavings > 0
+  const filteredVoucherSuggestions = useMemo(() => {
+    const ranked = vouchers
+      .map((voucher) => {
+        const disabledReason = getVoucherDisabledReason(voucher)
+        return { voucher, disabledReason }
+      })
+      .sort((a, b) => {
+        if (!a.disabledReason && b.disabledReason) return -1
+        if (a.disabledReason && !b.disabledReason) return 1
+        return 0
+      })
+
+    if (!normalizedVoucherInput) {
+      return ranked.slice(0, 6)
+    }
+
+    return ranked
+      .filter(({ voucher }) => {
+        const code = voucher.code.toUpperCase()
+        const title = voucher.title.toUpperCase()
+        return code.includes(normalizedVoucherInput) || title.includes(normalizedVoucherInput)
+      })
+      .slice(0, 6)
+  }, [vouchers, normalizedVoucherInput, subtotal, now])
 
   useEffect(() => {
     setDeliveryInfo((prev) => ({
@@ -187,6 +301,95 @@ export default function CartPage() {
 
     fetchWards()
   }, [setShippingFee])
+
+  useEffect(() => {
+    const fetchVouchers = async () => {
+      if (!accessToken) {
+        setVouchers([])
+        setSelectedVoucherId('')
+        setVoucherCode('')
+        setVoucherInputCode('')
+        return
+      }
+
+      setIsLoadingVouchers(true)
+      try {
+        const data = await getMyVouchersApi()
+        setVouchers(data || [])
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || error?.message || 'Không thể tải voucher')
+      } finally {
+        setIsLoadingVouchers(false)
+      }
+    }
+
+    fetchVouchers()
+  }, [accessToken])
+
+  useEffect(() => {
+    if (!selectedVoucherId) {
+      return
+    }
+
+    const selected = vouchers.find((voucher) => String(voucher.voucherId) === selectedVoucherId)
+    if (!selected) {
+      setSelectedVoucherId('')
+      setVoucherCode('')
+      setVoucherInputCode('')
+      return
+    }
+
+    if (getVoucherDisabledReason(selected)) {
+      setSelectedVoucherId('')
+      setVoucherCode('')
+      setVoucherInputCode('')
+    }
+  }, [vouchers, selectedVoucherId, subtotal])
+
+  const applyVoucher = (voucher: UserVoucherResponse) => {
+    const disabledReason = getVoucherDisabledReason(voucher)
+    if (disabledReason) {
+      toast.info(disabledReason)
+      return false
+    }
+
+    setSelectedVoucherId(String(voucher.voucherId))
+    setVoucherCode(voucher.code)
+    setVoucherInputCode(voucher.code)
+    toast.success(`Đã áp dụng voucher ${voucher.code}`)
+    return true
+  }
+
+  const handleApplyVoucher = () => {
+    const normalizedInput = normalizedVoucherInput
+    const fromInput = normalizedInput
+      ? vouchers.find((voucher) => voucher.code.trim().toUpperCase() === normalizedInput)
+      : undefined
+    const fromSelect = vouchers.find((voucher) => String(voucher.voucherId) === selectedVoucherId)
+    const targetVoucher = fromInput || fromSelect
+
+    if (!targetVoucher) {
+      setSelectedVoucherId('')
+      setVoucherCode('')
+      toast.info('Mã voucher không hợp lệ!', { duration: 1500 })
+      return
+    }
+
+    applyVoucher(targetVoucher)
+  }
+
+  const handlePickSuggestion = (voucher: UserVoucherResponse) => {
+    setVoucherInputCode(voucher.code)
+    setSelectedVoucherId(String(voucher.voucherId))
+    setVoucherCode(voucher.code)
+    setIsVoucherPanelOpen(false)
+  }
+
+  const handleClearVoucher = () => {
+    setSelectedVoucherId('')
+    setVoucherCode('')
+    setVoucherInputCode('')
+  }
 
   const handleWardChange = (wardId: string) => {
     setSelectedWardId(wardId)
@@ -247,7 +450,7 @@ export default function CartPage() {
           wardId: Number(selectedWardId),
           addressDetail: addressDetail.trim(),
           note: note.trim() || undefined,
-          voucherCode: voucherCode.trim() || undefined,
+          voucherCode: voucherCode.trim() || selectedVoucher?.code?.trim() || undefined,
         },
         accessToken
       )
@@ -259,6 +462,9 @@ export default function CartPage() {
       }
 
       clearCart()
+      setSelectedVoucherId('')
+      setVoucherCode('')
+      setVoucherInputCode('')
       toast.success(orderResponse.message || 'Dat hang thanh cong')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Khong the dat hang')
@@ -620,20 +826,79 @@ export default function CartPage() {
         <div className="lg:col-span-1">
           <div className="card p-6 sticky top-24">
             <h2 className="font-semibold text-secondary-900 mb-4">Mã giảm giá</h2>
-            <div className="flex gap-2 mb-6">
-              <input
-                className="input flex-1 text-sm"
-                placeholder="FOODIESS"
-                value={voucherCode}
-                onChange={(event) => setVoucherCode(event.target.value)}
-              />
-              <button
-                type="button"
-                className="btn-primary btn-md shrink-0"
-                onClick={() => toast.info('Ma giam gia se duoc ap dung khi dat hang')}
-              >
-                Áp dụng
-              </button>
+            <div className="space-y-3 mb-6">
+              <div className="relative">
+                <label className="block text-xs text-secondary-500 mb-1">Nhập hoặc chọn mã voucher</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+                  <input
+                    className="input w-full pl-9 pr-3 text-sm border-secondary-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    placeholder="Nhập mã, ví dụ: FOOD"
+                    value={voucherInputCode}
+                    onFocus={() => setIsVoucherPanelOpen(true)}
+                    onBlur={() => {
+                      setTimeout(() => setIsVoucherPanelOpen(false), 120)
+                    }}
+                    onChange={(event) => {
+                      setVoucherInputCode(event.target.value.toUpperCase())
+                      setSelectedVoucherId('')
+                      setIsVoucherPanelOpen(true)
+                    }}
+                  />
+                  </div>
+                  <button type="button" className="btn-primary btn-md shrink-0" onClick={handleApplyVoucher}>
+                    Áp dụng
+                  </button>
+                </div>
+                {isVoucherPanelOpen && !isLoadingVouchers && (
+                  <div className="absolute z-20 mt-2 w-full rounded-xl border border-border bg-white shadow-lg overflow-hidden">
+                    <div className="max-h-56 overflow-auto p-2 space-y-1">
+                      {filteredVoucherSuggestions.length === 0 ? (
+                        <p className="text-xs text-secondary-500 px-2 py-2">Không tìm thấy voucher phù hợp</p>
+                      ) : (
+                        filteredVoucherSuggestions.map(({ voucher, disabledReason }) => {
+                          const isActive = selectedVoucherId === String(voucher.voucherId)
+
+                          return (
+                            <button
+                              key={`suggest-${voucher.voucherId}`}
+                              type="button"
+                              className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                                isActive
+                                  ? 'border-primary/50 bg-primary/5 shadow-sm'
+                                  : 'border-secondary-300 bg-white hover:border-secondary-500 hover:bg-secondary-50'
+                              } ${disabledReason ? 'opacity-60' : ''}`}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handlePickSuggestion(voucher)}
+                            >
+                              <p className="text-xs font-semibold text-secondary-900">{voucher.code}</p>
+                              <p className="text-[11px] text-secondary-700 mt-0.5">{voucher.title}</p>
+                              <p className="text-[11px] text-secondary-500 mt-0.5 whitespace-pre-line">{getVoucherBenefitText(voucher)}</p>
+                              {disabledReason && (
+                                <p className="text-[11px] text-error mt-1">{disabledReason}</p>
+                              )}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+                {isLoadingVouchers && (
+                  <p className="text-xs text-secondary-500 mt-2">Đang tải voucher...</p>
+                )}
+              </div>
+
+              {voucherCode && (
+                <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/5 px-3 py-2">
+                  <p className="text-xs text-success font-medium">Đang áp dụng: {voucherCode}</p>
+                  <button type="button" onClick={handleClearVoucher} className="text-xs text-secondary-500 hover:text-secondary-700">
+                    Bỏ chọn
+                  </button>
+                </div>
+              )}
+
             </div>
 
             <h2 className="font-semibold text-secondary-900 mb-4">Tóm tắt đơn hàng</h2>
@@ -652,16 +917,16 @@ export default function CartPage() {
                 <span>Phí giao hàng</span>
                 <span>{formatPrice(shippingFee)}</span>
               </div>
-              {discount > 0 && (
+              {effectiveDiscount > 0 && (
                 <div className="flex justify-between text-success">
-                  <span>Giảm giá</span>
-                  <span>-{formatPrice(discount)}</span>
+                  <span>Giảm giá {voucherCode ? `(${voucherCode})` : ''}</span>
+                  <span>-{formatPrice(effectiveDiscount)}</span>
                 </div>
               )}
               <div className="pt-3 border-t border-border flex justify-between font-bold text-base">
                 <span>Tổng thanh toán</span>
                 <div className="text-right">
-                  <span className="text-primary text-lg block">{formatPrice(total)}</span>
+                  <span className="text-primary text-lg block">{formatPrice(payableTotal)}</span>
                   {hasVisibleFlashSaleSavings && (
                     <span className="text-secondary-500 text-xs line-through">
                       {formatPrice(totalWithoutFlashSale)}
@@ -731,7 +996,7 @@ export default function CartPage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <span className="text-secondary-500">Tổng tiền</span>
-                <span className="col-span-2 text-lg font-bold text-primary">{formatPrice(total)}</span>
+                <span className="col-span-2 text-lg font-bold text-primary">{formatPrice(payableTotal)}</span>
               </div>
             </div>
 
