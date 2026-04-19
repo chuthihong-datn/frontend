@@ -22,6 +22,48 @@ type SaveVoucherPayload =
   | { data: AvailableVoucherResponse }
   | ApiErrorResponse
 
+const SAVED_VOUCHER_CACHE_KEY = 'foody-saved-vouchers'
+
+function readSavedVoucherCache(): AvailableVoucherResponse[] {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SAVED_VOUCHER_CACHE_KEY)
+    if (!raw) {
+      return []
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed as AvailableVoucherResponse[]
+  } catch {
+    return []
+  }
+}
+
+function writeSavedVoucherCache(vouchers: AvailableVoucherResponse[]) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(SAVED_VOUCHER_CACHE_KEY, JSON.stringify(vouchers))
+}
+
+export function getCachedSavedVouchers(): AvailableVoucherResponse[] {
+  return readSavedVoucherCache()
+}
+
+export function cacheSavedVoucher(voucher: AvailableVoucherResponse) {
+  const current = readSavedVoucherCache()
+  const next = [voucher, ...current.filter((item) => String(item.voucherId) !== String(voucher.voucherId))]
+  writeSavedVoucherCache(next)
+}
+
 
 export const getProfile = async (): Promise<ProfileResponse> => {
   const response = await apiClient.get('/user/profile')

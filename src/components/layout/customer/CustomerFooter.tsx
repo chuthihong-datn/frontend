@@ -18,6 +18,9 @@ export default function CustomerFooter() {
               Giao hàng tận nơi, món ngon tận hưởng. Chúng tôi kết nối bạn với
               những nhà hàng tốt nhất trong khu vực.
             </p>
+            <p className="text-sm text-secondary-200 mb-4">
+              Giờ hoạt động: 8:00 - 22:00 hàng ngày
+            </p>
             <div className="flex gap-3">
               <a
                 href="#"

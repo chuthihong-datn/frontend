@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { User, ClipboardList, Tag, LogOut } from 'lucide-react'
-import { getMyVouchersApi } from '@/api/user'
+import { getCachedSavedVouchers, getMyVouchersApi } from '@/api/user'
 import { useAuthStore } from '@/store/authStore'
 import Pagination from '@/components/shared/Pagination'
 import type { UserVoucherResponse } from '@/types'
@@ -93,8 +93,18 @@ export default function VoucherPage() {
       setIsLoading(true)
       try {
         const data = await getMyVouchersApi()
-        setVouchers(data || [])
+        const cached = getCachedSavedVouchers()
+        const merged = [...(data || []), ...cached].filter(
+          (voucher, index, self) =>
+            index === self.findIndex((item) => String(item.voucherId) === String(voucher.voucherId))
+        )
+        setVouchers(merged)
       } catch (error: any) {
+        const cached = getCachedSavedVouchers()
+        if (cached.length > 0) {
+          setVouchers(cached)
+        }
+
         toast.error(error?.response?.data?.message || error?.message || 'Không thể tải voucher của bạn')
       } finally {
         setIsLoading(false)

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Clock, Tag } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { getAvailableVouchersApi, saveVoucherApi } from '@/api/user'
+import { cacheSavedVoucher, getAvailableVouchersApi, saveVoucherApi } from '@/api/user'
 import { useAuthStore } from '@/store/authStore'
 import type { AvailableVoucherResponse } from '@/types'
 import { formatPrice } from '@/lib/utils'
@@ -131,6 +131,7 @@ export default function VoucherPage() {
         return
       }
 
+      cacheSavedVoucher(response)
       setSavedVoucherIds((current) => [...current, response.voucherId])
       toast.success(`Đã lưu mã ${response.code}`)
     } catch (error: any) {

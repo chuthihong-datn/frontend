@@ -69,6 +69,31 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
   }
 }
 
+const STORE_OPEN_HOUR = 8
+const STORE_CLOSE_HOUR = 22
+const STORE_HOURS_ERROR_MESSAGE = 'Cửa hàng chỉ nhận đơn từ 8:00 - 22:00'
+
+function isStoreOpenNow(): boolean {
+  const currentHour = new Date().getHours()
+  return currentHour >= STORE_OPEN_HOUR && currentHour < STORE_CLOSE_HOUR
+}
+
+function normalizeStoreHoursError(message: string): string {
+  const normalized = message.toLowerCase()
+
+  if (
+    normalized.includes('cửa hàng chỉ nhận đơn') ||
+    normalized.includes('cua hang chi nhan don') ||
+    normalized.includes('8h đến 22h') ||
+    normalized.includes('8h den 22h') ||
+    normalized.includes('8:00 - 22:00')
+  ) {
+    return STORE_HOURS_ERROR_MESSAGE
+  }
+
+  return message
+}
+
 export default function CartPage() {
   const [isLoadingCart, setIsLoadingCart] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -110,6 +135,7 @@ export default function CartPage() {
   const selectedWard = wards.find((ward) => String(ward.wardId) === selectedWardId)
   const paymentMethodLabel =
     paymentMethod === 'vnpay' ? 'VNPay' : paymentMethod === 'momo' ? 'Ví điện tử' : 'Tiền mặt'
+  const storeOpenNow = isStoreOpenNow()
 
   const now = Date.now()
   const selectedVoucher = useMemo(
@@ -404,6 +430,11 @@ export default function CartPage() {
   }
 
   const handleCheckout = () => {
+    if (!storeOpenNow) {
+      toast.error(STORE_HOURS_ERROR_MESSAGE)
+      return
+    }
+
     const nextErrors = {
       fullName: deliveryInfo.fullName.trim() ? '' : 'Mục này là bắt buộc',
       phone: deliveryInfo.phone.trim() ? '' : 'Mục này là bắt buộc',
@@ -423,6 +454,12 @@ export default function CartPage() {
 
   const handleConfirmCheckout = async () => {
     if (isCheckingOut) {
+      return
+    }
+
+    if (!storeOpenNow) {
+      toast.error(STORE_HOURS_ERROR_MESSAGE)
+      setShowCheckoutConfirm(false)
       return
     }
 
@@ -467,7 +504,8 @@ export default function CartPage() {
       setVoucherInputCode('')
       toast.success(orderResponse.message || 'Dat hang thanh cong')
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Khong the dat hang')
+      const message = error?.response?.data?.message || error?.message || 'Khong the dat hang'
+      toast.error(normalizeStoreHoursError(message))
     } finally {
       setIsCheckingOut(false)
     }
@@ -938,12 +976,17 @@ export default function CartPage() {
 
             <button
               onClick={handleCheckout}
-              disabled={isCheckingOut}
+              disabled={isCheckingOut || !storeOpenNow}
               className="btn-primary btn-lg w-full mt-6 flex items-center justify-center gap-2"
             >
               {isCheckingOut ? 'Dang xu ly...' : checkoutButtonLabel}
               <ChevronRight className="w-4 h-4" />
             </button>
+            {!storeOpenNow && (
+              <p className="mt-3 text-xs text-rose-600 text-center">
+                {STORE_HOURS_ERROR_MESSAGE}
+              </p>
+            )}
           </div>
         </div>
       </div>

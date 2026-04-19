@@ -501,7 +501,7 @@ export default function AdminPromotionsPage() {
         <div className="flex items-center gap-2">
           <button type="button" className="btn-outline btn-md" onClick={loadData}>
             <RefreshCw className="w-4 h-4" />
-            Làm mới
+            Tải lại
           </button>
           <button type="button" className="btn-primary btn-md" onClick={openCreateModal}>
             <Plus className="w-4 h-4" />

@@ -614,3 +614,45 @@ export type AdminFlashSaleResponse = {
   createdAt?: string | null
   updatedAt?: string | null
 }
+
+// ============================================================
+// ADMIN / STATISTICS
+// ============================================================
+
+export type AdminDailyStatsResponse = {
+  date: string
+  revenue: number
+  orderCount: number
+}
+
+export type AdminHourlyStatsResponse = {
+  hour: number
+  revenue: number
+  orderCount: number
+}
+
+export type AdminMonthlyStatsResponse = {
+  month: string | number
+  year?: number
+  revenue: number
+  orderCount: number
+}
+
+export type AdminProductStatsResponse = {
+  menuName: string
+  quantity: number
+}
+
+export type AdminTodayMenuStatisticResponse = {
+  menuId: string | number
+  menuName: string
+  totalQuantity: number
+}
+
+export type AdminFlashSaleSuggestionResponse = {
+  type: string
+  reason: string
+  hour: number
+  discount: number
+  duration: string
+}
