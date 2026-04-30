@@ -575,6 +575,16 @@ export type AdminVoucherResponse = {
   updatedAt?: string | null
 }
 
+export type AdminReviewResponse = {
+  reviewId: string | number
+  menuName: string
+  userName: string
+  rating: number
+  comment: string
+  createdAt: string
+  isDeleted: boolean
+}
+
 export type AdminFlashSaleRequest = {
   title: string
   description: string

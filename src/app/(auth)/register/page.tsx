@@ -47,7 +47,8 @@ export default function RegisterPage() {
 
       if (res?.success === false) {
         toast.error(res.message || 'Đăng ký thất bại. Vui lòng thử lại', {
-          duration: 2000,})
+          duration: 2000,
+        })
         return
       }
 
@@ -71,9 +72,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="h-screen flex">
+    <div className="min-h-screen flex lg:h-screen">
       {/* Left */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-secondary-900">
+      <div className="hidden lg:flex lg:w-1/2 lg:h-screen lg:sticky lg:top-0 relative bg-secondary-900 overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800"
           alt="Food"
@@ -98,8 +99,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Right */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-start justify-center px-8 py-10 lg:h-screen lg:overflow-y-auto">
+        <div className="w-full max-w-sm pt-2 pb-6">
           <div className="mb-8">
             <Link
               href="/"
@@ -131,7 +132,7 @@ export default function RegisterPage() {
             </Link>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Full Name */}
             <div>
               <label className="block text-sm font-medium mb-1.5">
@@ -140,6 +141,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
                 <input
+                  name="register-full-name"
                   type="text"
                   placeholder="Nguyễn Văn A"
                   value={form.fullName}
@@ -147,6 +149,7 @@ export default function RegisterPage() {
                     setForm({ ...form, fullName: e.target.value })
                   }
                   required
+                  autoComplete="off"
                   className="input pl-10"
                 />
               </div>
@@ -160,6 +163,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
                 <input
+                  name="register-email"
                   type="email"
                   placeholder="your@email.com"
                   value={form.email}
@@ -167,6 +171,7 @@ export default function RegisterPage() {
                     setForm({ ...form, email: e.target.value })
                   }
                   required
+                  autoComplete="off"
                   className="input pl-10"
                 />
               </div>
@@ -180,6 +185,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
                 <input
+                  name="register-phone"
                   type="tel"
                   placeholder="0123456789"
                   value={form.phone}
@@ -187,6 +193,7 @@ export default function RegisterPage() {
                     setForm({ ...form, phone: e.target.value })
                   }
                   required
+                  autoComplete="off"
                   className="input pl-10"
                 />
               </div>
@@ -200,6 +207,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
                 <input
+                  name="register-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={form.password}
@@ -207,6 +215,7 @@ export default function RegisterPage() {
                     setForm({ ...form, password: e.target.value })
                   }
                   required
+                  autoComplete="new-password"
                   className="input pl-10 pr-10"
                 />
                 <button
@@ -227,6 +236,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
                 <input
+                  name="register-confirm-password"
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={form.confirmPassword}
@@ -237,6 +247,7 @@ export default function RegisterPage() {
                     })
                   }
                   required
+                  autoComplete="new-password"
                   className="input pl-10 pr-10"
                 />
                 <button
@@ -259,16 +270,6 @@ export default function RegisterPage() {
               {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
             </button>
           </form>
-
-          <p className="text-center text-sm text-secondary-500 mt-6">
-            Bạn đã có tài khoản?{' '}
-            <Link
-              href="/login"
-              className="text-primary font-medium hover:underline"
-            >
-              Đăng nhập ngay
-            </Link>
-          </p>
         </div>
       </div>
     </div>

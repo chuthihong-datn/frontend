@@ -26,60 +26,75 @@ npm run dev
 
 ```
 src/
-├── app/                        # Next.js App Router
-│   ├── (auth)/                 # Route group: Auth (không có header/footer)
+├── api/                            # API layer theo từng module
+│   ├── adminAccount.ts
+│   ├── adminCategory.ts
+│   ├── adminMenu.ts
+│   ├── adminPromotion.ts
+│   ├── adminStatistic.ts
+│   ├── adminTopping.ts
+│   ├── auth.ts
+│   ├── cart.ts
+│   ├── category.ts
+│   ├── index.ts
+│   ├── menu.ts
+│   ├── order.ts
+│   ├── user.ts
+│   └── ward.ts
+├── app/                            # Next.js App Router
+│   ├── layout.tsx
+│   ├── (admin)/                    # Route group: Admin
+│   │   ├── layout.tsx
+│   │   ├── accounts/page.tsx
+│   │   ├── categories/page.tsx
+│   │   ├── dashboard/page.tsx
+│   │   ├── delivery-address/page.tsx
+│   │   ├── menus/page.tsx
+│   │   ├── orders/page.tsx
+│   │   ├── promotions/page.tsx
+│   │   └── toppings/page.tsx
+│   ├── (auth)/                     # Route group: Auth
+│   │   ├── layout.tsx
 │   │   ├── login/page.tsx
 │   │   └── register/page.tsx
-│   ├── (customer)/             # Route group: Giao diện khách hàng
-│   │   ├── layout.tsx          # Layout với Header + Footer
-│   │   ├── page.tsx            # Trang chủ
-│   │   ├── menu/
-│   │   │   ├── page.tsx        # Danh sách món ăn
-│   │   │   └── [id]/page.tsx   # Chi tiết món ăn
-│   │   ├── cart/page.tsx       # Giỏ hàng & thanh toán
-│   │   ├── voucher/page.tsx    # Kho voucher
-│   │   └── profile/page.tsx   # Tài khoản người dùng
-│   └── (admin)/                # Route group: Admin Dashboard
-│       ├── layout.tsx          # Layout với Sidebar + Header
-│       ├── dashboard/page.tsx
-│       ├── orders/page.tsx
-│       ├── products/page.tsx
-│       └── users/page.tsx
-│
+│   ├── (customer)/                 # Route group: Customer
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   ├── cart/page.tsx
+│   │   ├── menu/page.tsx
+│   │   ├── menu/[id]/page.tsx
+│   │   ├── payment/page.tsx
+│   │   ├── payment/success/page.tsx
+│   │   ├── profile/page.tsx
+│   │   ├── profile/my-voucher/page.tsx
+│   │   ├── profile/orders/page.tsx
+│   │   └── voucher/page.tsx
+│   └── api/payment/vnpay-return/route.ts
 ├── components/
-│   ├── layout/
-│   │   ├── customer/           # CustomerHeader, CustomerFooter
-│   │   └── admin/              # AdminSidebar, AdminHeader
 │   ├── customer/
-│   │   ├── home/               # HeroBanner, CategorySection, FeaturedProducts
-│   │   ├── menu/               # ProductCard, MenuFilter, MenuGrid
-│   │   ├── cart/               # CartItem, CartSummary
-│   │   ├── voucher/            # VoucherCard
-│   │   └── profile/            # OrderHistory, ProfileForm
-│   ├── admin/                  # AdminTable, StatsCard, ...
-│   ├── shared/                 # QueryProvider, Pagination, ...
-│   └── ui/                     # Button, Input, Modal, ... (design system)
-│
-├── lib/
-│   ├── api.ts                  # Axios instance + interceptors
-│   ├── utils.ts                # cn(), formatPrice(), formatDate(), ...
-│   └── services/
-│       ├── productService.ts
-│       ├── orderService.ts
-│       └── authService.ts
-│
+│   │   ├── home/
+│   │   ├── menu/
+│   │   └── profile/
+│   ├── layout/
+│   │   ├── admin/
+│   │   └── customer/
+│   └── shared/
 ├── hooks/
-│   └── index.ts                # useProducts, useOrders, useLogin, ...
-│
+│   └── index.ts
+├── lib/
+│   ├── api.ts
+│   ├── utils.ts
+│   └── services/
+│       ├── authService.ts
+│       ├── orderService.ts
+│       └── productService.ts
 ├── store/
-│   ├── cartStore.ts            # Zustand: Cart state
-│   └── authStore.ts            # Zustand: Auth state
-│
-├── types/
-│   └── index.ts                # TypeScript interfaces
-│
-└── styles/
-    └── globals.css             # Tailwind + CSS variables + utility classes
+│   ├── authStore.ts
+│   └── cartStore.ts
+├── styles/
+│   └── globals.css
+└── types/
+    └── index.ts
 ```
 
 ---

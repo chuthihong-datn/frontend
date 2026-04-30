@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, Playfair_Display } from 'next/font/google'
 import '@/styles/globals.css'
 import { Toaster } from 'sonner'
 import QueryProvider from '@/components/shared/QueryProvider'
+import PaymentSuccessToast from '@/components/shared/PaymentSuccessToast'
 
 const beVietnam = Be_Vietnam_Pro({
   subsets: ['vietnamese', 'latin'],
@@ -40,7 +41,6 @@ export default function RootLayout({
     <html lang="vi" className={`${beVietnam.variable} ${playfair.variable}`}>
       <body>
         <QueryProvider>
-          {children}
           <Toaster
             position="top-right"
             richColors
@@ -50,6 +50,8 @@ export default function RootLayout({
               },
             }}
           />
+          <PaymentSuccessToast />
+          {children}
         </QueryProvider>
       </body>
     </html>

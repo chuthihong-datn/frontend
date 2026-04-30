@@ -70,7 +70,7 @@ const mapServerItemToStoreItem = (item: CartItemResponse): CartItem => {
 }
 
 const STORE_OPEN_HOUR = 8
-const STORE_CLOSE_HOUR = 22
+const STORE_CLOSE_HOUR = 24
 const STORE_HOURS_ERROR_MESSAGE = 'Cửa hàng chỉ nhận đơn từ 8:00 - 22:00'
 
 function isStoreOpenNow(): boolean {
@@ -493,7 +493,7 @@ export default function CartPage() {
       )
 
       if (orderResponse.paymentUrl) {
-        toast.success('Dang chuyen den cong thanh toan VNPay...')
+        toast.success('Đang chuyển hướng đến cổng thanh toán VNPay...')
         window.location.href = orderResponse.paymentUrl
         return
       }

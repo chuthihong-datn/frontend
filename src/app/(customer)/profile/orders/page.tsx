@@ -3,11 +3,12 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { User, ClipboardList, Tag, LogOut, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { User, ClipboardList, Tag, LogOut, ChevronLeft, ChevronRight, X, Star, Eye } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { formatPrice } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getMyOrderDetail, getMyOrders } from '@/api/user'
+import apiClient from '@/lib/api'
 import type { OrderByUserResponse } from '@/types'
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
@@ -34,6 +35,12 @@ export default function OrderHistoryPage() {
   const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false)
   const [isLoadingOrderDetail, setIsLoadingOrderDetail] = useState(false)
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderByUserResponse | null>(null)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [reviewOrderId, setReviewOrderId] = useState<string | number | null>(null)
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewItemsState, setReviewItemsState] = useState<Array<{orderDetailId: number | string | null; menuName: string; rating: number; comment: string}>>([])
+  const [isLoadingReviewItems, setIsLoadingReviewItems] = useState(false)
   const itemsPerPage = 10
 
   const handleLogout = () => {
@@ -120,6 +127,87 @@ export default function OrderHistoryPage() {
     }
   }
 
+  const handleOpenReview = (orderId: number | string) => {
+    // Load order detail and prepare per-item review payloads
+    setReviewOrderId(orderId)
+    setReviewRating(5)
+    setReviewComment('')
+    setIsLoadingReviewItems(true)
+
+    getMyOrderDetail(orderId)
+      .then((detail) => {
+        const items = (detail.items || []).map((it: any) => {
+          const orderDetailId = (it as any).orderDetailId ?? (it as any).id ?? null
+          return {
+            orderDetailId,
+            menuName: it.menuName || it.productName || 'Món ăn',
+            rating: 5,
+            comment: '',
+          }
+        })
+        setReviewItemsState(items)
+        setIsReviewOpen(true)
+      })
+      .catch((error: any) => {
+        toast.error(error?.response?.data?.message || error?.message || 'Không thể tải thông tin đơn hàng để đánh giá')
+      })
+      .finally(() => setIsLoadingReviewItems(false))
+  }
+
+  const setItemRating = (index: number, rating: number) => {
+    setReviewItemsState((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], rating }
+      return next
+    })
+  }
+
+  const setItemComment = (index: number, comment: string) => {
+    setReviewItemsState((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], comment }
+      return next
+    })
+  }
+
+  const handleSubmitReview = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!reviewOrderId) return
+    if (reviewItemsState.length === 0) {
+      toast.error('Không có mục nào để đánh giá')
+      return
+    }
+
+    try {
+      const payload = {
+        orderId: Number(reviewOrderId),
+        reviews: reviewItemsState.map((it) => ({
+          orderDetailId: it.orderDetailId,
+          rating: it.rating,
+          comment: it.comment,
+        })),
+      }
+
+      await apiClient.post('/reviews', payload)
+
+      toast.success('Đánh giá thành công')
+      setIsReviewOpen(false)
+      setReviewOrderId(null)
+      setReviewItemsState([])
+
+      // refresh orders list
+      try {
+        const myOrders = await getMyOrders()
+        setOrders(myOrders)
+      } catch (_) {
+        // ignore refresh errors
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Không thể gửi đánh giá')
+    }
+  }
+
   return (
     <div className="container-page py-8">
       <div className="grid lg:grid-cols-4 gap-8">
@@ -185,7 +273,14 @@ export default function OrderHistoryPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full table-fixed text-sm">
+                    <colgroup>
+                      <col className="w-[120px]" />
+                      <col className="w-[110px]" />
+                      <col className="w-[120px]" />
+                      <col className="w-[140px]" />
+                      <col className="w-[180px]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-border">
                         {['Mã đơn hàng', 'Ngày đặt', 'Trạng thái', 'Tổng tiền', 'Thao tác'].map((h) => (
@@ -198,22 +293,38 @@ export default function OrderHistoryPage() {
                     <tbody>
                       {paginatedOrders.map((order) => (
                         <tr key={order.orderId} className="border-b border-border last:border-0 hover:bg-secondary-50 transition-colors">
-                          <td className="py-3 px-2 font-mono font-semibold text-secondary-900">#{order.orderId}</td>
+                          <td className="py-3 px-2 font-mono font-semibold text-secondary-900 whitespace-nowrap truncate">#{order.orderId}</td>
                           <td className="py-3 px-2 text-secondary-600">{formatOrderDate(order.createdAt)}</td>
                           <td className="py-3 px-2">
-                            <span className={STATUS_MAP[order.orderStatus]?.class ?? 'badge'}>
+                            <span className={`${STATUS_MAP[order.orderStatus]?.class ?? 'badge'} inline-flex max-w-full items-center justify-center whitespace-nowrap px-2 py-1 text-[11px] leading-none`}>
                               {STATUS_MAP[order.orderStatus]?.label || order.orderStatus}
                             </span>
                           </td>
                           <td className="py-3 px-2 font-semibold text-primary">{formatPrice(order.finalAmount)}</td>
                           <td className="py-3 px-2">
-                            <button
-                              type="button"
-                              onClick={() => handleViewOrderDetail(order.orderId)}
-                              className="text-primary hover:underline text-xs font-medium"
-                            >
-                              Xem chi tiết
-                            </button>
+                            <div className="flex flex-nowrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleViewOrderDetail(order.orderId)}
+                                className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+                                title="Xem chi tiết"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Chi tiết</span>
+                              </button>
+
+                              {order.orderStatus === 'COMPLETED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenReview(order.orderId)}
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 whitespace-nowrap"
+                                  title="Đánh giá đơn hàng"
+                                >
+                                  <Star className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Đánh giá</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -377,6 +488,99 @@ export default function OrderHistoryPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {isReviewOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 p-4 flex items-center justify-center">
+          <form onSubmit={handleSubmitReview} className="w-full max-w-lg rounded-2xl border border-border bg-white shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-bold text-secondary-900">
+                Đánh giá đơn #{reviewOrderId ?? '--'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReviewOpen(false)
+                  setReviewOrderId(null)
+                  setReviewRating(5)
+                  setReviewComment('')
+                  setReviewItemsState([])
+                  setIsLoadingReviewItems(false)
+                }}
+                className="p-2 rounded-lg text-secondary-500 hover:bg-secondary-100 hover:text-secondary-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {isLoadingReviewItems ? (
+                <p className="text-sm text-secondary-500">Đang tải danh sách món để đánh giá...</p>
+              ) : reviewItemsState.length === 0 ? (
+                <p className="text-sm text-secondary-500">Không có mục nào để đánh giá.</p>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-secondary-700">Đánh giá từng món trong đơn</p>
+                  {reviewItemsState.map((it, idx) => (
+                    <div key={`${String(it.orderDetailId)}-${idx}`} className="rounded-xl border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-secondary-900">{it.menuName}</div>
+                        <div className="text-sm text-secondary-600">ID: {String(it.orderDetailId ?? '--')}</div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setItemRating(idx, star)}
+                              className="rounded-full p-1 transition-transform hover:scale-110"
+                            >
+                              <Star className={`h-7 w-7 ${star <= it.rating ? 'fill-amber-400 text-amber-400' : 'text-secondary-300'}`} />
+                            </button>
+                          ))}
+                        </div>
+
+                        <label className="mb-2 block text-sm font-medium text-secondary-700 mt-3">Nhận xét cho món</label>
+                        <textarea
+                          value={it.comment}
+                          onChange={(e) => setItemComment(idx, e.target.value)}
+                          rows={3}
+                          className="input-field w-full rounded-xl border border-border px-4 py-2 text-sm outline-none focus:border-primary"
+                          placeholder="Nhận xét về món này"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReviewOpen(false)
+                    setReviewOrderId(null)
+                    setReviewRating(5)
+                    setReviewComment('')
+                    setReviewItemsState([])
+                    setIsLoadingReviewItems(false)
+                  }}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-secondary-700 transition-colors hover:bg-secondary-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+                >
+                  Gửi đánh giá
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       )}
     </div>

@@ -169,7 +169,10 @@ export default function CustomerHeader() {
             {/* User */}
             {user ? (
               <div className="relative group">
-                <button className="flex items-center gap-2 p-1 hover:bg-secondary-50 rounded-xl transition-colors">
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 p-1 hover:bg-secondary-50 rounded-xl transition-colors"
+                >
                   {user.avtUrl ? (
                     <img
                       src={user.avtUrl}
@@ -183,7 +186,7 @@ export default function CustomerHeader() {
                       </span>
                     </div>
                   )}
-                </button>
+                </Link>
                 {/* Dropdown */}
                 <div
                   className="absolute right-0 top-full mt-1 w-48 bg-white rounded-2xl shadow-modal border border-border 
