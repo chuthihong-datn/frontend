@@ -23,14 +23,33 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor — handle 401
+// Response interceptor — handle 401 and token expired
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+    const data = error.response?.data
+    
+    // Handle 401 (token expired/invalid)
+    if (status === 401) {
       useAuthStore.getState().logout()
-      window.location.href = '/login'
+      // Only redirect if not already on login page
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
     }
+    
+    // Also check for business logic errors about token expiry
+    if (typeof data === 'object' && data !== null) {
+      const message = String(data.message || data.error || '').toLowerCase()
+      if (message.includes('token') && (message.includes('expired') || message.includes('hết hạn'))) {
+        useAuthStore.getState().logout()
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login'
+        }
+      }
+    }
+    
     return Promise.reject(error)
   }
 )

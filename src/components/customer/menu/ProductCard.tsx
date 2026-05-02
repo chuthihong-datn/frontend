@@ -166,7 +166,7 @@ export default function ProductCard({
     >
       <div className="card-hover overflow-hidden">
         {/* Image */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-secondary-100">
+        <div className="relative aspect-[4/3] overflow-hidden bg-secondary-100 flex items-center justify-center">
           {hasFlashSale && typeof product.discountPercent === 'number' && product.discountPercent > 0 && (
             <span className="absolute top-2 left-2 z-10 rounded-md bg-primary px-2 py-1 text-xs font-bold text-white shadow-sm">
               -{product.discountPercent}%
@@ -177,7 +177,7 @@ export default function ProductCard({
             alt={product.name}
             fill
             onError={() => setImageSrc(FALLBACK_IMAGE)}
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
           {/* Out of Stock Text */}
           {isOutOfStock && (

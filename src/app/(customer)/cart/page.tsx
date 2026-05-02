@@ -1049,7 +1049,7 @@ export default function CartPage() {
                 className="btn-outline btn-md"
                 onClick={() => {
                   setShowCheckoutConfirm(false)
-                  toast.info('Ban da huy dat hang')
+                  toast.info('Bạn đã hủy đặt hàng')
                 }}
                 disabled={isCheckingOut}
               >

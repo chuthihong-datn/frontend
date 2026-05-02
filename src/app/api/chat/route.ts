@@ -1,7 +1,5 @@
 export async function POST(req: Request) {
-  const { messages } = await req.json();
-
-  const lastMessage = messages[messages.length - 1].content;
+  const { message } = await req.json();
 
   const res = await fetch("http://localhost:1503/api/chat", {
     method: "POST",
@@ -9,13 +7,14 @@ export async function POST(req: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      message: lastMessage,
+      message: message,
     }),
   });
 
   const data = await res.json();
 
   return Response.json({
+    reply: data.reply,
     content: data.reply,
   });
 }

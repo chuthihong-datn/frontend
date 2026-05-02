@@ -554,7 +554,7 @@ export default function AdminPromotionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
             <input
               className="input pl-9"
-              placeholder="Tìm kiếm theo mã, tiêu đề, mô tả"
+              placeholder="Tìm theo mã hoặc tiêu đề"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />

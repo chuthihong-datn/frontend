@@ -799,10 +799,6 @@ export default function AdminMenusPage() {
 						</div>
 					</div>
 				)}
-
-				<p className="text-xs text-secondary-500 mt-3">
-					Món ăn bị tạm ẩn sẽ không bị xóa khỏi hệ thống, chỉ ngừng hiển thị cho khách hàng.
-				</p>
 			</section>
 
 			{modalMode && (

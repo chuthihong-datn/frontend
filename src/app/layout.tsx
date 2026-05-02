@@ -4,6 +4,7 @@ import '@/styles/globals.css'
 import { Toaster } from 'sonner'
 import QueryProvider from '@/components/shared/QueryProvider'
 import PaymentSuccessToast from '@/components/shared/PaymentSuccessToast'
+import AuthProvider from '@/components/shared/AuthProvider'
 
 const beVietnam = Be_Vietnam_Pro({
   subsets: ['vietnamese', 'latin'],
@@ -41,17 +42,19 @@ export default function RootLayout({
     <html lang="vi" className={`${beVietnam.variable} ${playfair.variable}`}>
       <body>
         <QueryProvider>
-          <Toaster
-            position="top-right"
-            richColors
-            toastOptions={{
-              style: {
-                fontFamily: 'var(--font-be-vietnam)',
-              },
-            }}
-          />
-          <PaymentSuccessToast />
-          {children}
+          <AuthProvider>
+            <Toaster
+              position="top-right"
+              richColors
+              toastOptions={{
+                style: {
+                  fontFamily: 'var(--font-be-vietnam)',
+                },
+              }}
+            />
+            <PaymentSuccessToast />
+            {children}
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

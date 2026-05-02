@@ -6,6 +6,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const widgetRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -32,25 +33,50 @@ export default function ChatWidget() {
   }, [open]);
 
   const sendMessage = async () => {
-    if (!input) return;
+    if (!input || isThinking) return;
 
     const userMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsThinking(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        messages: [...messages, userMessage],
-      }),
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: input,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
+      const reply = data.reply || data.content;
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", content: data.content },
-    ]);
+      if (res.ok && reply) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: reply },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data.message || "Xin lỗi, AI đang bận 😢",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Xin lỗi, có lỗi xảy ra 😢" },
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (
@@ -125,21 +151,34 @@ export default function ChatWidget() {
                 </div>
               </div>
             ))}
+
+            {isThinking && (
+              <div className="flex justify-start">
+                <div className="flex items-center gap-1.5 rounded-xl border border-white/70 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.2s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.1s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" />
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
 
           {/* Input */}
           <div className="flex gap-1.5 border-t border-white/40 bg-white/58 p-2 backdrop-blur">
             <input
-              className="flex-1 rounded-lg border border-white/60 bg-white/78 px-2.5 py-1.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+              className="flex-1 rounded-lg border border-white/60 bg-white/78 px-2.5 py-1.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-orange-300 focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Nhập tin nhắn..."
+              disabled={isThinking}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             />
             <button
               onClick={sendMessage}
-              className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 text-[13px] text-white shadow-sm transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+              disabled={isThinking}
+              className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 text-[13px] text-white shadow-sm transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Gửi tin nhắn"
             >
               <svg

@@ -24,6 +24,7 @@ import {
   getAdminMonthlyMenuStatsApi,
 } from '@/api/adminStatistic'
 import { formatPrice } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
 import type {
   AdminDailyStatsResponse,
   AdminHourlyStatsResponse,
@@ -326,6 +327,7 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [loadingMonthlyMenu, setLoadingMonthlyMenu] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [exportLoading, setExportLoading] = useState(false)
   const [trendMode, setTrendMode] = useState<TrendMode>('month')
 
   const loadInitialData = async () => {
@@ -348,6 +350,41 @@ export default function DashboardPage() {
       toast.error(message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const exportReport = async () => {
+    setExportLoading(true)
+    try {
+      const accessToken = useAuthStore.getState().accessToken
+      const res = await fetch(`/api/admin/reports/monthly/${selectedYear}/${selectedMonth}`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || 'Không thể xuất báo cáo')
+      }
+
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition') || ''
+      const match = cd.match(/filename="?([^";]+)"?/) || []
+      const filename = match[1] || `report_${selectedMonth}_${selectedYear}.xlsx`
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+
+      toast.success('Báo cáo đã được tải xuống')
+    } catch (error: any) {
+      toast.error(error?.message || 'Xuất báo cáo thất bại')
+    } finally {
+      setExportLoading(false)
     }
   }
 
@@ -570,6 +607,40 @@ export default function DashboardPage() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Tải lại
           </button>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              disabled={exportLoading}
+              className="rounded-lg border border-border bg-white px-2 py-1 text-sm"
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Tháng {i + 1}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              disabled={exportLoading}
+              className="rounded-lg border border-border bg-white px-2 py-1 text-sm"
+            >
+              {Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={exportReport}
+              disabled={exportLoading}
+              className="btn btn-primary btn-sm"
+            >
+              {exportLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xuất báo cáo'}
+            </button>
+          </div>
         </div>
       </div>
 
